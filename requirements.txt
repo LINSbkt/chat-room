@@ -1,0 +1,17 @@
+# Core Dependencies
+PyQt6>=6.4.0
+cryptography>=3.4.8
+pytest>=7.0.0
+pytest-qt>=4.0.0
+
+# Network & Communication
+# socket, threading, json, uuid are built-in Python modules
+
+# Utilities
+# pathlib, datetime, logging, configparser are built-in Python modules
+
+# Development Tools
+black>=22.0.0
+flake8>=4.0.0
+mypy>=0.950
+
