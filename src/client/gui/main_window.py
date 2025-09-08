@@ -176,15 +176,35 @@ class MainWindow(QMainWindow):
         """Handle user list update."""
         print(f"DEBUG: User list updated with {len(users)} users: {users}")
         self.user_list.clear()
-        for user in users:
-            self.user_list.addItem(user)
+        
+        # Sort users with current user first
+        sorted_users = sorted(users)
+        if self.username in sorted_users:
+            sorted_users.remove(self.username)
+            sorted_users.insert(0, self.username)
+        
+        for user in sorted_users:
+            if user == self.username:
+                # Mark current user with special formatting
+                item_text = f"👤 {user} (You)"
+            else:
+                item_text = f"👤 {user}"
+            
+            self.user_list.addItem(item_text)
             print(f"DEBUG: Added user to list: {user}")
     
     @pyqtSlot(str)
     def on_system_message(self, message):
         """Handle system message."""
         timestamp = datetime.now().strftime("%H:%M:%S")
-        formatted_message = f"(System) ({timestamp}) {message}"
+        
+        # Check if it's a user join/leave notification
+        if "joined the chat" in message:
+            formatted_message = f"(System) ({timestamp}) 🟢 {message}"
+        elif "left the chat" in message:
+            formatted_message = f"(System) ({timestamp}) 🔴 {message}"
+        else:
+            formatted_message = f"(System) ({timestamp}) {message}"
         
         self.message_display.append(formatted_message)
         self.scroll_to_bottom()
@@ -192,8 +212,18 @@ class MainWindow(QMainWindow):
     @pyqtSlot(str)
     def on_error_occurred(self, error_message):
         """Handle error message."""
-        QMessageBox.warning(self, "Error", error_message)
-        self.status_label.setText(f"Error: {error_message}")
+        print(f"DEBUG: Error occurred: {error_message}")
+        
+        # Check if it's an authentication error
+        if "already taken" in error_message or "Authentication failed" in error_message or "Not authenticated" in error_message:
+            # Show error dialog and close window to allow retry
+            QMessageBox.warning(self, "Authentication Failed", 
+                              f"Authentication failed: {error_message}\n\nPlease try again with a different username.")
+            self.close()  # Close the window to allow retry
+        else:
+            # Show regular error message
+            QMessageBox.warning(self, "Error", error_message)
+            self.status_label.setText(f"Error: {error_message}")
     
     @pyqtSlot(bool)
     def on_connection_status_changed(self, connected):
