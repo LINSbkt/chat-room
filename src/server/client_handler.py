@@ -160,10 +160,21 @@ class ClientHandler:
             return
         
         try:
+            print(f"DEBUG: Handling private message from {self.username}")
+            print(f"DEBUG: Message data: {message.data}")
+            print(f"DEBUG: Message recipient attribute: {message.recipient}")
+            
             content = message.data.get('content', '').strip()
             recipient = message.data.get('recipient', '').strip()
             
+            # Fallback to message.recipient if not in data
+            if not recipient and hasattr(message, 'recipient'):
+                recipient = message.recipient
+            
+            print(f"DEBUG: Extracted content: '{content}', recipient: '{recipient}'")
+            
             if not content or not recipient:
+                print(f"DEBUG: Invalid format - content: '{content}', recipient: '{recipient}'")
                 self.send_error_message("Invalid private message format")
                 return
             
@@ -180,6 +191,7 @@ class ClientHandler:
             
         except Exception as e:
             self.logger.error(f"Error handling private message: {e}")
+            print(f"DEBUG: Exception in handle_private_message: {e}")
     
     def handle_user_list_request(self, message: Message):
         """Handle user list request."""
