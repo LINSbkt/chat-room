@@ -1,0 +1,35 @@
+warning: in the working copy of 'src/client/chat_client.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/client/crypto_manager.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/client/gui/main_window.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/client/main.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/server/chat_server.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/server/client_handler.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/server/crypto_manager.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/server/message_router.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/shared/crypto_manager.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/shared/message_types.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/shared/protocols.py', LF will be replaced by CRLF the next time Git touches it
+ debug_auth_issue.py            |  78 [31m------------[m
+ debug_connection.py            |  64 [31m----------[m
+ minimal_auth_test.py           |  55 [31m---------[m
+ simple_auth_test.py            |  48 [31m--------[m
+ src/server/chat_server.py      |   3 [32m+[m
+ src/shared/message_types.py    | 198 [32m++++++++++++++++++++++++++++++[m
+ test_auth_error_fix.py         |  50 [31m--------[m
+ test_auth_fix.py               |  89 [31m--------------[m
+ test_auth_simple.py            |  51 [31m--------[m
+ test_connection_fix.py         |  57 [31m---------[m
+ test_encryption_logging.py     | 145 [31m----------------------[m
+ test_encryption_simple.py      |  80 [31m------------[m
+ test_final_phase1.py           | 116 [31m------------------[m
+ test_phase1.py                 | 106 [31m----------------[m
+ test_phase1_complete.py        | 145 [31m----------------------[m
+ test_phase2.py                 | 270 [31m-----------------------------------------[m
+ test_phase2_fixed.py           | 211 [31m--------------------------------[m
+ test_phase2_manual.py          | 212 [31m--------------------------------[m
+ test_phase2_simple.py          | 135 [31m---------------------[m
+ test_phase3.py                 |  99 [31m---------------[m
+ test_phase3_complete.py        | 110 [31m-----------------[m
+ test_private_message_format.py |  68 [31m-----------[m
+ test_private_messaging.py      |  61 [31m----------[m
+ 23 files changed, 201 insertions(+), 2250 deletions(-)

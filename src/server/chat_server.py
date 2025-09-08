@@ -11,6 +11,7 @@ try:
     from .client_handler import ClientHandler
     from .message_router import MessageRouter
     from .auth_manager import AuthManager
+    from .crypto_manager import ServerCryptoManager
     from ..shared.message_types import MessageType, SystemMessage, UserListMessage
     from ..shared.protocols import ConnectionManager
 except ImportError:
@@ -20,6 +21,7 @@ except ImportError:
     from server.client_handler import ClientHandler
     from server.message_router import MessageRouter
     from server.auth_manager import AuthManager
+    from server.crypto_manager import ServerCryptoManager
     from shared.message_types import MessageType, SystemMessage, UserListMessage
     from shared.protocols import ConnectionManager
 
@@ -35,6 +37,7 @@ class ChatServer:
         self.active_clients: Dict[str, ClientHandler] = {}
         self.message_router = MessageRouter(self)
         self.auth_manager = AuthManager()
+        self.crypto_manager = ServerCryptoManager()
         self.running = False
         self.server_socket: Optional[socket.socket] = None
         

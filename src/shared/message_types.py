@@ -36,6 +36,12 @@ class MessageType(Enum):
     # System messages
     SYSTEM_MESSAGE = "SYSTEM_MESSAGE"
     ERROR_MESSAGE = "ERROR_MESSAGE"
+    
+    # Encryption messages
+    KEY_EXCHANGE_REQUEST = "KEY_EXCHANGE_REQUEST"
+    KEY_EXCHANGE_RESPONSE = "KEY_EXCHANGE_RESPONSE"
+    AES_KEY_EXCHANGE = "AES_KEY_EXCHANGE"
+    ENCRYPTED_MESSAGE = "ENCRYPTED_MESSAGE"
 
 
 class Message:
@@ -120,6 +126,28 @@ class ChatMessage(Message):
     @property
     def is_private(self) -> bool:
         return self.data['is_private']
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'ChatMessage':
+        """Create ChatMessage from dictionary."""
+        # Handle timestamp conversion
+        timestamp = data.get('timestamp')
+        if isinstance(timestamp, str):
+            from datetime import datetime
+            timestamp = datetime.fromisoformat(timestamp)
+        
+        message = cls(
+            content=data['data']['content'],
+            sender=data['sender'],
+            recipient=data.get('recipient'),
+            is_private=data['data']['is_private']
+        )
+        
+        # Set timestamp if provided
+        if timestamp:
+            message.timestamp = timestamp
+        
+        return message
 
 
 class SystemMessage(Message):
@@ -142,6 +170,26 @@ class SystemMessage(Message):
     @property
     def system_message_type(self) -> str:
         return self.data['system_message_type']
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'SystemMessage':
+        """Create SystemMessage from dictionary."""
+        # Handle timestamp conversion
+        timestamp = data.get('timestamp')
+        if isinstance(timestamp, str):
+            from datetime import datetime
+            timestamp = datetime.fromisoformat(timestamp)
+        
+        message = cls(
+            content=data['data']['content'],
+            message_type=data['data']['system_message_type']
+        )
+        
+        # Set timestamp if provided
+        if timestamp:
+            message.timestamp = timestamp
+        
+        return message
 
 
 class UserListMessage(Message):
@@ -160,3 +208,153 @@ class UserListMessage(Message):
     @property
     def users(self) -> list:
         return self.data['users']
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'UserListMessage':
+        """Create UserListMessage from dictionary."""
+        # Handle timestamp conversion
+        timestamp = data.get('timestamp')
+        if isinstance(timestamp, str):
+            from datetime import datetime
+            timestamp = datetime.fromisoformat(timestamp)
+        
+        message = cls(
+            users=data['data']['users'],
+            sender=data.get('sender')
+        )
+        
+        # Set timestamp if provided
+        if timestamp:
+            message.timestamp = timestamp
+        
+        return message
+
+
+class KeyExchangeMessage(Message):
+    """Message class for RSA key exchange."""
+    
+    def __init__(self, public_key: str, sender: str):
+        data = {
+            'public_key': public_key
+        }
+        super().__init__(
+            message_type=MessageType.KEY_EXCHANGE_REQUEST,
+            data=data,
+            sender=sender
+        )
+    
+    @property
+    def public_key(self) -> str:
+        return self.data['public_key']
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'KeyExchangeMessage':
+        """Create KeyExchangeMessage from dictionary."""
+        # Handle timestamp conversion
+        timestamp = data.get('timestamp')
+        if isinstance(timestamp, str):
+            from datetime import datetime
+            timestamp = datetime.fromisoformat(timestamp)
+        
+        message = cls(
+            public_key=data['data']['public_key'],
+            sender=data['sender']
+        )
+        
+        # Set timestamp if provided
+        if timestamp:
+            message.timestamp = timestamp
+        
+        return message
+
+
+class AESKeyMessage(Message):
+    """Message class for AES key exchange."""
+    
+    def __init__(self, encrypted_aes_key: str, sender: str, recipient: str):
+        data = {
+            'encrypted_aes_key': encrypted_aes_key
+        }
+        super().__init__(
+            message_type=MessageType.AES_KEY_EXCHANGE,
+            data=data,
+            sender=sender,
+            recipient=recipient
+        )
+    
+    @property
+    def encrypted_aes_key(self) -> str:
+        return self.data['encrypted_aes_key']
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'AESKeyMessage':
+        """Create AESKeyMessage from dictionary."""
+        # Handle timestamp conversion
+        timestamp = data.get('timestamp')
+        if isinstance(timestamp, str):
+            from datetime import datetime
+            timestamp = datetime.fromisoformat(timestamp)
+        
+        message = cls(
+            encrypted_aes_key=data['data']['encrypted_aes_key'],
+            sender=data['sender'],
+            recipient=data['recipient']
+        )
+        
+        # Set timestamp if provided
+        if timestamp:
+            message.timestamp = timestamp
+        
+        return message
+
+
+class EncryptedMessage(Message):
+    """Message class for encrypted messages."""
+    
+    def __init__(self, encrypted_content: str, sender: str, recipient: Optional[str] = None, 
+                 is_private: bool = False):
+        data = {
+            'encrypted_content': encrypted_content,
+            'is_private': is_private
+        }
+        
+        # Add recipient to data if it's a private message
+        if is_private and recipient:
+            data['recipient'] = recipient
+        
+        super().__init__(
+            message_type=MessageType.ENCRYPTED_MESSAGE,
+            data=data,
+            sender=sender,
+            recipient=recipient
+        )
+    
+    @property
+    def encrypted_content(self) -> str:
+        return self.data['encrypted_content']
+    
+    @property
+    def is_private(self) -> bool:
+        return self.data['is_private']
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'EncryptedMessage':
+        """Create EncryptedMessage from dictionary."""
+        # Handle timestamp conversion
+        timestamp = data.get('timestamp')
+        if isinstance(timestamp, str):
+            from datetime import datetime
+            timestamp = datetime.fromisoformat(timestamp)
+        
+        message = cls(
+            encrypted_content=data['data']['encrypted_content'],
+            sender=data['sender'],
+            recipient=data.get('recipient'),
+            is_private=data['data']['is_private']
+        )
+        
+        # Set timestamp if provided
+        if timestamp:
+            message.timestamp = timestamp
+        
+        return message
