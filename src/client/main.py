@@ -62,6 +62,12 @@ def main():
                 QMessageBox.critical(None, "Connection Error", "Failed to connect to server")
                 continue  # Retry login
             
+            # Wait for authentication
+            if not chat_client.wait_for_authentication(timeout=5.0):
+                QMessageBox.critical(None, "Authentication Error", "Authentication failed or timed out")
+                chat_client.disconnect()
+                continue  # Retry login
+            
             # Show main window
             main_window.show()
             

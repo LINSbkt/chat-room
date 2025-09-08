@@ -39,6 +39,9 @@ class ChatClient(QObject):
         self.connected = False
         self.username: Optional[str] = None
         self.receive_thread: Optional[threading.Thread] = None
+        self.auth_event = threading.Event()  # Event to signal authentication completion
+        self.auth_success = False  # Track authentication success
+        self.intentional_disconnect = False  # Track if disconnect is intentional
         
         # Setup logging
         logging.basicConfig(level=logging.INFO)
@@ -47,6 +50,10 @@ class ChatClient(QObject):
     def connect(self, username: str) -> bool:
         """Connect to the server."""
         try:
+            # Reset authentication state
+            self.auth_event.clear()
+            self.auth_success = False
+            
             self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.client_socket.connect((self.server_host, self.server_port))
             
@@ -71,8 +78,21 @@ class ChatClient(QObject):
             self.error_occurred.emit(f"Failed to connect: {e}")
             return False
     
-    def disconnect(self):
+    def wait_for_authentication(self, timeout: float = 5.0) -> bool:
+        """Wait for authentication response from server."""
+        print(f"DEBUG: Waiting for authentication (timeout: {timeout}s)")
+        
+        # Wait for authentication event
+        if self.auth_event.wait(timeout):
+            print(f"DEBUG: Authentication completed, success: {self.auth_success}")
+            return self.auth_success
+        else:
+            print("DEBUG: Authentication timeout")
+            return False
+    
+    def disconnect(self, intentional: bool = True):
         """Disconnect from the server."""
+        self.intentional_disconnect = intentional
         self.connected = False
         
         if self.connection_manager:
@@ -89,22 +109,31 @@ class ChatClient(QObject):
     
     def _receive_loop(self):
         """Main receive loop running in separate thread."""
+        print("DEBUG: Receive loop started")
         while self.connected and self.connection_manager and self.connection_manager.is_connected():
             try:
+                print("DEBUG: Waiting for message...")
                 message = self.connection_manager.receive_message()
                 if message is None:
+                    print("DEBUG: Received None message, breaking loop")
                     break
                 
+                print(f"DEBUG: Received message: {message.message_type}")
                 self._handle_message(message)
                 
             except Exception as e:
+                print(f"DEBUG: Exception in receive loop: {e}")
                 self.logger.error(f"Error receiving message: {e}")
                 break
         
         # Connection lost
+        print("DEBUG: Connection lost, setting connected=False")
         self.connected = False
         self.connection_status_changed.emit(False)
-        self.error_occurred.emit("Connection lost")
+        
+        # Only emit error if disconnect was not intentional
+        if not self.intentional_disconnect:
+            self.error_occurred.emit("Connection lost")
     
     def _handle_message(self, message: Message):
         """Handle incoming messages."""
@@ -113,6 +142,8 @@ class ChatClient(QObject):
             if message.message_type == MessageType.AUTH_RESPONSE:
                 # Authentication successful
                 print("DEBUG: Authentication successful, emitting connection status")
+                self.auth_success = True
+                self.auth_event.set()  # Signal authentication completion
                 self.connection_status_changed.emit(True)
                 self.logger.info("Authentication successful")
             elif message.message_type == MessageType.PUBLIC_MESSAGE:
@@ -121,8 +152,11 @@ class ChatClient(QObject):
                 self.message_received.emit(message)
             elif message.message_type == MessageType.SYSTEM_MESSAGE:
                 # Check if it's an error message
-                if hasattr(message, 'system_message_type') and message.system_message_type == 'error':
+                system_type = message.data.get('system_message_type', 'info')
+                if system_type == 'error':
                     self.connected = False  # Mark as disconnected on error
+                    self.auth_success = False
+                    self.auth_event.set()  # Signal authentication completion (failed)
                     self.error_occurred.emit(message.data['content'])
                 else:
                     self.system_message.emit(message.data['content'])
@@ -154,7 +188,9 @@ class ChatClient(QObject):
             return False
         
         try:
+            print(f"DEBUG: Sending private message to {recipient}: {content}")
             message = ChatMessage(content, self.username, recipient, is_private=True)
+            print(f"DEBUG: Created message: {message.to_dict()}")
             return self.connection_manager.send_message(message)
         except Exception as e:
             self.logger.error(f"Failed to send private message: {e}")
