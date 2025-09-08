@@ -107,5 +107,15 @@ class ConnectionManager:
     
     def is_connected(self) -> bool:
         """Check if the connection is still active."""
-        return self.connected
+        if not self.connected:
+            return False
+        
+        # Check if socket is still connected by trying to get socket info
+        try:
+            # This will raise an exception if the socket is closed
+            self.socket.getpeername()
+            return True
+        except (OSError, socket.error):
+            self.connected = False
+            return False
 

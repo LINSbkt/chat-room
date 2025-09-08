@@ -54,6 +54,10 @@ class ChatServer:
             self.logger.info(f"Server started on {self.host}:{self.port}")
             self.logger.info(f"Maximum clients: {self.max_clients}")
             
+            # Small delay to ensure server is fully ready
+            import time
+            time.sleep(0.1)
+            
             while self.running:
                 try:
                     client_socket, client_address = self.server_socket.accept()

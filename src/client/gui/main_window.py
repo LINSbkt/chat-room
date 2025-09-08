@@ -6,7 +6,8 @@ import sys
 from datetime import datetime
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                             QTextEdit, QLineEdit, QPushButton, QListWidget, 
-                            QLabel, QSplitter, QMessageBox, QApplication)
+                            QLabel, QSplitter, QMessageBox, QApplication,
+                            QComboBox, QCheckBox)
 from PyQt6.QtCore import Qt, pyqtSlot
 from PyQt6.QtGui import QFont, QColor
 try:
@@ -56,6 +57,24 @@ class MainWindow(QMainWindow):
         self.message_display.setFont(QFont("Consolas", 10))
         chat_layout.addWidget(QLabel("Messages:"))
         chat_layout.addWidget(self.message_display)
+        
+        # Message type selection
+        message_type_layout = QHBoxLayout()
+        message_type_layout.addWidget(QLabel("Message Type:"))
+        
+        self.message_type_combo = QComboBox()
+        self.message_type_combo.addItems(["Public", "Private"])
+        self.message_type_combo.currentTextChanged.connect(self.on_message_type_changed)
+        message_type_layout.addWidget(self.message_type_combo)
+        
+        # Recipient selection (initially hidden)
+        message_type_layout.addWidget(QLabel("To:"))
+        self.recipient_combo = QComboBox()
+        self.recipient_combo.setVisible(False)
+        message_type_layout.addWidget(self.recipient_combo)
+        
+        message_type_layout.addStretch()
+        chat_layout.addLayout(message_type_layout)
         
         # Input area
         input_layout = QHBoxLayout()
@@ -141,8 +160,10 @@ class MainWindow(QMainWindow):
         sender = message.sender or 'Unknown'
         formatted_message = f"(Global) ({timestamp}) {sender}: {content}"
         
-        # Add to display
+        # Add to display with color coding
+        self.message_display.setTextColor(QColor(0, 100, 0))  # Dark green for public messages
         self.message_display.append(formatted_message)
+        self.message_display.setTextColor(QColor(0, 0, 0))  # Reset to black
         self.scroll_to_bottom()
     
     def display_public_message_sent(self, content: str):
@@ -150,8 +171,21 @@ class MainWindow(QMainWindow):
         timestamp = datetime.now().strftime("%H:%M:%S")
         formatted_message = f"(Global) ({timestamp}) {self.username}: {content}"
         
-        # Add to display
+        # Add to display with color coding
+        self.message_display.setTextColor(QColor(0, 100, 0))  # Dark green for public messages
         self.message_display.append(formatted_message)
+        self.message_display.setTextColor(QColor(0, 0, 0))  # Reset to black
+        self.scroll_to_bottom()
+    
+    def display_private_message_sent(self, content: str, recipient: str):
+        """Display a private message sent by this client."""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        formatted_message = f"(Private) (To {recipient}) ({timestamp}) {self.username}: {content}"
+        
+        # Add to display with color coding
+        self.message_display.setTextColor(QColor(150, 0, 150))  # Purple for private messages
+        self.message_display.append(formatted_message)
+        self.message_display.setTextColor(QColor(0, 0, 0))  # Reset to black
         self.scroll_to_bottom()
     
     def display_private_message(self, message):
@@ -167,8 +201,10 @@ class MainWindow(QMainWindow):
         sender = message.sender or 'Unknown'
         formatted_message = f"(Private) (From {sender}) ({timestamp}): {content}"
         
-        # Add to display with different color (if possible)
+        # Add to display with color coding
+        self.message_display.setTextColor(QColor(150, 0, 150))  # Purple for private messages
         self.message_display.append(formatted_message)
+        self.message_display.setTextColor(QColor(0, 0, 0))  # Reset to black
         self.scroll_to_bottom()
     
     @pyqtSlot(list)
@@ -182,6 +218,11 @@ class MainWindow(QMainWindow):
         if self.username in sorted_users:
             sorted_users.remove(self.username)
             sorted_users.insert(0, self.username)
+        
+        # Update recipient combo box (exclude current user)
+        self.recipient_combo.clear()
+        other_users = [user for user in sorted_users if user != self.username]
+        self.recipient_combo.addItems(other_users)
         
         for user in sorted_users:
             if user == self.username:
@@ -206,7 +247,10 @@ class MainWindow(QMainWindow):
         else:
             formatted_message = f"(System) ({timestamp}) {message}"
         
+        # Add to display with color coding
+        self.message_display.setTextColor(QColor(0, 0, 150))  # Blue for system messages
         self.message_display.append(formatted_message)
+        self.message_display.setTextColor(QColor(0, 0, 0))  # Reset to black
         self.scroll_to_bottom()
     
     @pyqtSlot(str)
@@ -240,6 +284,15 @@ class MainWindow(QMainWindow):
             self.message_input.setEnabled(False)
             print("DEBUG: UI disabled - not connected")
     
+    def on_message_type_changed(self, message_type: str):
+        """Handle message type change."""
+        if message_type == "Private":
+            self.recipient_combo.setVisible(True)
+            self.message_input.setPlaceholderText("Type your private message here...")
+        else:
+            self.recipient_combo.setVisible(False)
+            self.message_input.setPlaceholderText("Type your message here...")
+    
     def send_message(self):
         """Send a message."""
         print(f"DEBUG: send_message called, client={self.chat_client}, connected={self.chat_client.connected if self.chat_client else None}")
@@ -253,15 +306,30 @@ class MainWindow(QMainWindow):
             print("DEBUG: Cannot send message - empty content")
             return
         
-        print(f"DEBUG: Sending message: {content}")
+        message_type = self.message_type_combo.currentText()
+        print(f"DEBUG: Sending {message_type.lower()} message: {content}")
         
-        # Send public message
-        success = self.chat_client.send_public_message(content)
+        success = False
+        if message_type == "Public":
+            # Send public message
+            success = self.chat_client.send_public_message(content)
+            if success:
+                # Display the sent message in the chat window
+                self.display_public_message_sent(content)
+        else:
+            # Send private message
+            recipient = self.recipient_combo.currentText()
+            if not recipient:
+                QMessageBox.warning(self, "Error", "Please select a recipient for private message")
+                return
+            
+            success = self.chat_client.send_private_message(content, recipient)
+            if success:
+                # Display the sent private message in the chat window
+                self.display_private_message_sent(content, recipient)
         
         if success:
             print("DEBUG: Message sent successfully")
-            # Display the sent message in the chat window
-            self.display_public_message_sent(content)
             self.message_input.clear()
         else:
             print("DEBUG: Failed to send message")
@@ -275,5 +343,6 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         """Handle window close event."""
         if self.chat_client:
-            self.chat_client.disconnect()
+            # Disconnect gracefully without showing error messages
+            self.chat_client.disconnect(intentional=True)
         event.accept()
