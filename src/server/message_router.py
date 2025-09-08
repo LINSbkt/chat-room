@@ -31,6 +31,8 @@ class MessageRouter:
             # MessageType.PRIVATE_MESSAGE: self.handle_private_message,
             # USER_LIST_REQUEST is handled directly in ClientHandler
             # MessageType.USER_LIST_REQUEST: self.handle_user_list_request,
+            # FILE_TRANSFER_REQUEST is handled directly in ClientHandler
+            # MessageType.FILE_TRANSFER_REQUEST: self.handle_file_transfer_request,
             MessageType.KEY_EXCHANGE_REQUEST: self.handle_key_exchange_request,
             MessageType.AES_KEY_EXCHANGE: self.handle_aes_key_exchange,
             MessageType.ENCRYPTED_MESSAGE: self.handle_encrypted_message,
@@ -47,9 +49,14 @@ class MessageRouter:
                 # Don't log warning for messages handled directly by client handler
                 expected_direct_handlers = {
                     MessageType.AUTH_REQUEST,
+                    MessageType.AUTH_RESPONSE,
                     MessageType.PUBLIC_MESSAGE,
                     MessageType.PRIVATE_MESSAGE,
-                    MessageType.USER_LIST_REQUEST
+                    MessageType.USER_LIST_REQUEST,
+                    MessageType.FILE_TRANSFER_REQUEST,
+                    MessageType.FILE_TRANSFER_RESPONSE,
+                    MessageType.FILE_CHUNK,
+                    MessageType.FILE_TRANSFER_COMPLETE
                 }
                 if message.message_type not in expected_direct_handlers:
                     self.logger.warning(f"No handler for message type: {message.message_type}")

@@ -12,8 +12,10 @@ try:
     from .message_router import MessageRouter
     from .auth_manager import AuthManager
     from .crypto_manager import ServerCryptoManager
-    from ..shared.message_types import MessageType, SystemMessage, UserListMessage
+    from ..shared.message_types import (MessageType, SystemMessage, UserListMessage,
+                                      FileTransferResponse, FileChunk, FileTransferComplete)
     from ..shared.protocols import ConnectionManager
+    from ..shared.file_transfer_manager import FileTransferManager
 except ImportError:
     import sys
     import os
@@ -22,8 +24,10 @@ except ImportError:
     from server.message_router import MessageRouter
     from server.auth_manager import AuthManager
     from server.crypto_manager import ServerCryptoManager
-    from shared.message_types import MessageType, SystemMessage, UserListMessage
+    from shared.message_types import (MessageType, SystemMessage, UserListMessage,
+                                    FileTransferResponse, FileChunk, FileTransferComplete)
     from shared.protocols import ConnectionManager
+    from shared.file_transfer_manager import FileTransferManager
 
 
 class ChatServer:
@@ -38,6 +42,7 @@ class ChatServer:
         self.message_router = MessageRouter(self)
         self.auth_manager = AuthManager()
         self.crypto_manager = ServerCryptoManager()
+        self.file_transfer_manager = FileTransferManager()
         self.running = False
         self.server_socket: Optional[socket.socket] = None
         
@@ -155,6 +160,20 @@ class ChatServer:
         user_list_message = UserListMessage(users)
         self.broadcast_message(user_list_message)
     
+    def broadcast_file_transfer_request(self, message, exclude_user: Optional[str] = None):
+        """Broadcast a file transfer request to all clients except the sender."""
+        success_count = 0
+        total_clients = 0
+        
+        for client_handler in self.active_clients.values():
+            if client_handler.username and client_handler.username != exclude_user:
+                total_clients += 1
+                if client_handler.send_message(message):
+                    success_count += 1
+        
+        self.logger.info(f"📤 Broadcasted file transfer request to {success_count}/{total_clients} clients")
+        return success_count > 0
+    
     def get_user_list(self) -> list:
         """Get list of currently connected usernames."""
         return [client.username for client in self.active_clients.values() if client.username]
@@ -169,3 +188,66 @@ class ChatServer:
             if client_handler.username == username:
                 return client_handler
         return None
+    
+    def forward_file_transfer_response(self, message: FileTransferResponse, sender_username: str) -> bool:
+        """Forward file transfer response to the original sender."""
+        try:
+            transfer_id = message.transfer_id
+            
+            # Find the original sender by looking through all clients
+            for client_handler in self.active_clients.values():
+                if client_handler.username and client_handler.username != sender_username:
+                    # Check if this client has an active transfer with this ID
+                    if hasattr(client_handler, 'file_transfer_manager') and client_handler.file_transfer_manager:
+                        if transfer_id in client_handler.file_transfer_manager.active_transfers:
+                            success = client_handler.send_message(message)
+                            if success:
+                                self.logger.info(f"📤 Forwarded file transfer response to {client_handler.username}")
+                            return success
+            
+            self.logger.warning(f"Could not find original sender for transfer {transfer_id}")
+            return False
+            
+        except Exception as e:
+            self.logger.error(f"Error forwarding file transfer response: {e}")
+            return False
+    
+    def forward_file_chunk(self, message: FileChunk, sender_username: str) -> bool:
+        """Forward file chunk to the recipient."""
+        try:
+            # Find the recipient by looking through active transfers
+            for client_handler in self.active_clients.values():
+                if client_handler.username and client_handler.username != sender_username:
+                    # Check if this client has an active transfer with this ID
+                    if message.transfer_id in client_handler.file_transfer_manager.active_transfers:
+                        success = client_handler.send_message(message)
+                        if success:
+                            self.logger.debug(f"📦 Forwarded file chunk to {client_handler.username}")
+                        return success
+            
+            self.logger.warning(f"Could not find recipient for transfer {message.transfer_id}")
+            return False
+            
+        except Exception as e:
+            self.logger.error(f"Error forwarding file chunk: {e}")
+            return False
+    
+    def forward_file_transfer_complete(self, message: FileTransferComplete, sender_username: str) -> bool:
+        """Forward file transfer completion to the recipient."""
+        try:
+            # Find the recipient by looking through active transfers
+            for client_handler in self.active_clients.values():
+                if client_handler.username and client_handler.username != sender_username:
+                    # Check if this client has an active transfer with this ID
+                    if message.transfer_id in client_handler.file_transfer_manager.active_transfers:
+                        success = client_handler.send_message(message)
+                        if success:
+                            self.logger.info(f"✅ Forwarded file transfer completion to {client_handler.username}")
+                        return success
+            
+            self.logger.warning(f"Could not find recipient for transfer completion {message.transfer_id}")
+            return False
+            
+        except Exception as e:
+            self.logger.error(f"Error forwarding file transfer completion: {e}")
+            return False

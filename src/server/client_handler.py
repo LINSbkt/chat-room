@@ -6,16 +6,22 @@ import logging
 import threading
 from typing import Optional
 try:
-    from ..shared.message_types import Message, MessageType, SystemMessage, ChatMessage
+    from ..shared.message_types import (Message, MessageType, SystemMessage, ChatMessage,
+                                      FileTransferRequest, FileTransferResponse, 
+                                      FileChunk, FileTransferComplete)
     from ..shared.protocols import ConnectionManager
     from ..shared.exceptions import AuthenticationError, ConnectionError
+    from ..shared.file_transfer_manager import FileTransferManager
 except ImportError:
     import sys
     import os
     sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-    from shared.message_types import Message, MessageType, SystemMessage, ChatMessage
+    from shared.message_types import (Message, MessageType, SystemMessage, ChatMessage,
+                                    FileTransferRequest, FileTransferResponse, 
+                                    FileChunk, FileTransferComplete)
     from shared.protocols import ConnectionManager
     from shared.exceptions import AuthenticationError, ConnectionError
+    from shared.file_transfer_manager import FileTransferManager
 
 
 class ClientHandler:
@@ -30,6 +36,7 @@ class ClientHandler:
         self.is_authenticated = False
         self.connected = True
         self.connection_manager = ConnectionManager(client_socket)
+        self.file_transfer_manager = FileTransferManager()
         
         # Setup logging
         self.logger = logging.getLogger(f"{__name__}.{self.client_id}")
@@ -65,7 +72,6 @@ class ClientHandler:
         """Process incoming messages."""
         try:
             self.logger.debug(f"Received message: {message.message_type}")
-            
             # Route all messages through the message router first
             if self.server.message_router.route_message(message, self):
                 return  # Message was handled by router
@@ -80,6 +86,14 @@ class ClientHandler:
                 self.handle_private_message(message)
             elif message.message_type == MessageType.USER_LIST_REQUEST:
                 self.handle_user_list_request(message)
+            elif message.message_type == MessageType.FILE_TRANSFER_REQUEST:
+                self.handle_file_transfer_request(message)
+            elif message.message_type == MessageType.FILE_TRANSFER_RESPONSE:
+                self.handle_file_transfer_response(message)
+            elif message.message_type == MessageType.FILE_CHUNK:
+                self.handle_file_chunk(message)
+            elif message.message_type == MessageType.FILE_TRANSFER_COMPLETE:
+                self.handle_file_transfer_complete(message)
             elif message.message_type == MessageType.DISCONNECT:
                 self.handle_disconnect(message)
             else:
@@ -132,11 +146,20 @@ class ClientHandler:
             self.server.add_client(self)
             print(f"DEBUG: Client {self.client_id} added to server")
             
-            # Send authentication response
+            # Send authentication response FIRST
             auth_response = Message(MessageType.AUTH_RESPONSE, {'username': username, 'status': 'success'})
             print(f"DEBUG: Sending AUTH_RESPONSE for user {username}")
             success = self.send_message(auth_response)
             print(f"DEBUG: AUTH_RESPONSE send result: {success}")
+            
+            if not success:
+                print(f"DEBUG: Failed to send AUTH_RESPONSE!")
+                self.send_error_message("Failed to send authentication response")
+                return
+            
+            # Wait a moment to ensure AUTH_RESPONSE is sent before other messages
+            import time
+            time.sleep(0.1)
             
             self.send_system_message(f"Welcome {username}!")
             self.logger.info(f"Client {self.client_id} authenticated as {username}")
@@ -230,6 +253,106 @@ class ClientHandler:
             
         except Exception as e:
             self.logger.error(f"Error handling user list request: {e}")
+    
+    def handle_file_transfer_request(self, message: FileTransferRequest):
+        """Handle file transfer request."""
+        if not self.is_authenticated:
+            self.send_error_message("Not authenticated")
+            return
+        
+        try:
+            self.logger.info(f"📤 File transfer request from {self.username}: {message.filename} ({message.file_size} bytes) to {message.recipient}")
+            
+            # Handle global file transfers
+            if message.recipient == "GLOBAL":
+                # Broadcast to all connected users except sender
+                success = self.server.broadcast_file_transfer_request(message, exclude_user=self.username)
+                if success:
+                    self.logger.info(f"📤 Broadcasted file transfer request to all users")
+                else:
+                    # Check if there are any other users to send to
+                    other_users = [client.username for client in self.server.active_clients.values() 
+                                 if client.username and client.username != self.username]
+                    if not other_users:
+                        self.logger.info(f"📤 No other users online to receive file transfer")
+                        # Don't send error message if no other users are online
+                    else:
+                        self.send_error_message("Failed to broadcast file transfer request")
+            else:
+                # Handle private file transfers
+                recipient_handler = self.server.get_client_by_username(message.recipient)
+                if not recipient_handler:
+                    self.send_error_message(f"User {message.recipient} not found")
+                    return
+                
+                # Forward the request to the recipient
+                success = recipient_handler.send_message(message)
+                if success:
+                    self.logger.info(f"📤 Forwarded file transfer request to {message.recipient}")
+                else:
+                    self.send_error_message("Failed to send file transfer request")
+                
+        except Exception as e:
+            self.logger.error(f"Error handling file transfer request: {e}")
+            self.send_error_message("Error processing file transfer request")
+    
+    def handle_file_transfer_response(self, message: FileTransferResponse):
+        """Handle file transfer response (accept/decline)."""
+        if not self.is_authenticated:
+            self.send_error_message("Not authenticated")
+            return
+        
+        try:
+            self.logger.info(f"📥 File transfer response from {self.username}: {'accepted' if message.accepted else 'declined'}")
+            
+            # Find the original sender and forward the response
+            # We need to track this through the server's file transfer system
+            success = self.server.forward_file_transfer_response(message, self.username)
+            if not success:
+                # Don't send error message that causes disconnection
+                # Just log the warning - the transfer might have already completed or been cancelled
+                self.logger.warning(f"Could not forward file transfer response for transfer {message.transfer_id}")
+                
+        except Exception as e:
+            self.logger.error(f"Error handling file transfer response: {e}")
+            self.send_error_message("Error processing file transfer response")
+    
+    def handle_file_chunk(self, message: FileChunk):
+        """Handle file chunk."""
+        if not self.is_authenticated:
+            self.send_error_message("Not authenticated")
+            return
+        
+        try:
+            self.logger.debug(f"📦 Received file chunk {message.chunk_index + 1}/{message.total_chunks} for transfer {message.transfer_id}")
+            
+            # Forward the chunk to the recipient
+            success = self.server.forward_file_chunk(message, self.username)
+            if not success:
+                self.send_error_message("Failed to forward file chunk")
+                
+        except Exception as e:
+            self.logger.error(f"Error handling file chunk: {e}")
+            self.send_error_message("Error processing file chunk")
+    
+    def handle_file_transfer_complete(self, message: FileTransferComplete):
+        """Handle file transfer completion."""
+        if not self.is_authenticated:
+            self.send_error_message("Not authenticated")
+            return
+        
+        try:
+            status = "completed successfully" if message.success else "failed"
+            self.logger.info(f"✅ File transfer {message.transfer_id} {status}")
+            
+            # Forward the completion message
+            success = self.server.forward_file_transfer_complete(message, self.username)
+            if not success:
+                self.send_error_message("Failed to process file transfer completion")
+                
+        except Exception as e:
+            self.logger.error(f"Error handling file transfer completion: {e}")
+            self.send_error_message("Error processing file transfer completion")
     
     def handle_disconnect(self, message: Message):
         """Handle client disconnect."""
