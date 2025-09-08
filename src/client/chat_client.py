@@ -120,7 +120,12 @@ class ChatClient(QObject):
             elif message.message_type == MessageType.PRIVATE_MESSAGE:
                 self.message_received.emit(message)
             elif message.message_type == MessageType.SYSTEM_MESSAGE:
-                self.system_message.emit(message.data['content'])
+                # Check if it's an error message
+                if hasattr(message, 'system_message_type') and message.system_message_type == 'error':
+                    self.connected = False  # Mark as disconnected on error
+                    self.error_occurred.emit(message.data['content'])
+                else:
+                    self.system_message.emit(message.data['content'])
             elif message.message_type == MessageType.USER_LIST_RESPONSE:
                 self.user_list_updated.emit(message.data['users'])
             elif message.message_type == MessageType.ERROR_MESSAGE:

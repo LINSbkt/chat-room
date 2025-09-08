@@ -41,33 +41,44 @@ def main():
     app = QApplication(sys.argv)
     
     try:
-        # Show login dialog
-        login_dialog = LoginDialog()
-        if login_dialog.exec() != login_dialog.DialogCode.Accepted:
-            sys.exit(0)
-        
-        username = login_dialog.get_username()
-        
-        # Create chat client
-        chat_client = ChatClient(args.server, args.port)
-        
-        # Create main window first
-        main_window = MainWindow()
-        main_window.set_chat_client(chat_client, username)
-        
-        # Connect to server
-        if not chat_client.connect(username):
-            QMessageBox.critical(None, "Connection Error", "Failed to connect to server")
-            sys.exit(1)
-        
-        # Show main window
-        main_window.show()
-        
-        # Request user list
-        chat_client.request_user_list()
-        
-        # Start Qt event loop
-        sys.exit(app.exec())
+        # Authentication loop - retry on failure
+        while True:
+            # Show login dialog
+            login_dialog = LoginDialog()
+            if login_dialog.exec() != login_dialog.DialogCode.Accepted:
+                sys.exit(0)
+            
+            username = login_dialog.get_username()
+            
+            # Create chat client
+            chat_client = ChatClient(args.server, args.port)
+            
+            # Create main window
+            main_window = MainWindow()
+            main_window.set_chat_client(chat_client, username)
+            
+            # Connect to server
+            if not chat_client.connect(username):
+                QMessageBox.critical(None, "Connection Error", "Failed to connect to server")
+                continue  # Retry login
+            
+            # Show main window
+            main_window.show()
+            
+            # Request user list
+            chat_client.request_user_list()
+            
+            # Start Qt event loop
+            result = app.exec()
+            
+            # If we get here, the main window was closed
+            # Check if it was due to authentication failure
+            if not chat_client.connected:
+                # Authentication failed, retry login
+                continue
+            else:
+                # Normal exit
+                sys.exit(result)
         
     except Exception as e:
         logger.error(f"Client error: {e}")
