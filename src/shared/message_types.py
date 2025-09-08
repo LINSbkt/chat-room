@@ -101,6 +101,11 @@ class ChatMessage(Message):
             'content': content,
             'is_private': is_private
         }
+        
+        # Add recipient to data if it's a private message
+        if is_private and recipient:
+            data['recipient'] = recipient
+        
         super().__init__(
             message_type=MessageType.PRIVATE_MESSAGE if is_private else MessageType.PUBLIC_MESSAGE,
             data=data,
