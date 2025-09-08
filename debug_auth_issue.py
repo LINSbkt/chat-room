@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script to verify authentication fix.
+Debug script to test authentication issue.
 """
 
 import time
@@ -17,15 +17,15 @@ from client.chat_client import ChatClient
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QTimer
 
-# Configure logging
+# Configure detailed logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-def test_authentication_fix():
-    """Test the authentication fix."""
-    print("🔧 TESTING AUTHENTICATION FIX")
+def test_authentication():
+    """Test authentication process."""
+    print("🔍 DEBUGGING AUTHENTICATION ISSUE")
     print("=" * 50)
     
     # Start server
@@ -48,31 +48,19 @@ def test_authentication_fix():
         # Try to connect
         if not client.connect('TestUser'):
             print("❌ Failed to connect")
-            return False
+            return
         
         print("⏳ Waiting for authentication...")
         
         # Wait for authentication
         if client.wait_for_authentication(timeout=10):
             print("✅ Authentication successful!")
-            
-            # Test sending a message
-            print("📤 Testing message sending...")
-            if client.send_public_message("Hello, this is a test message!"):
-                print("✅ Message sent successfully!")
-            else:
-                print("❌ Failed to send message")
-            
-            # Wait a bit
-            time.sleep(2)
-            
-            # Disconnect
-            client.disconnect()
-            print("👋 Client disconnected")
-            return True
         else:
             print("❌ Authentication failed or timed out")
-            return False
+        
+        # Disconnect
+        client.disconnect()
+        print("👋 Client disconnected")
     
     # Run test
     test_thread = threading.Thread(target=run_test, daemon=True)
@@ -86,4 +74,5 @@ def test_authentication_fix():
     print("🏁 Test completed")
 
 if __name__ == "__main__":
-    test_authentication_fix()
+    test_authentication()
+
