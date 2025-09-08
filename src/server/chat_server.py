@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 try:
     from .client_handler import ClientHandler
     from .message_router import MessageRouter
+    from .auth_manager import AuthManager
     from ..shared.message_types import MessageType, SystemMessage, UserListMessage
     from ..shared.protocols import ConnectionManager
 except ImportError:
@@ -18,6 +19,7 @@ except ImportError:
     sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
     from server.client_handler import ClientHandler
     from server.message_router import MessageRouter
+    from server.auth_manager import AuthManager
     from shared.message_types import MessageType, SystemMessage, UserListMessage
     from shared.protocols import ConnectionManager
 
@@ -32,6 +34,7 @@ class ChatServer:
         self.thread_pool = ThreadPoolExecutor(max_workers=max_clients)
         self.active_clients: Dict[str, ClientHandler] = {}
         self.message_router = MessageRouter(self)
+        self.auth_manager = AuthManager()
         self.running = False
         self.server_socket: Optional[socket.socket] = None
         

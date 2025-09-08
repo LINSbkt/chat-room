@@ -95,12 +95,21 @@ class ClientHandler:
         try:
             username = message.data.get('username', '').strip()
             
-            if not username:
-                self.send_error_message("Username cannot be empty")
+            # Use AuthManager for validation and authentication
+            if not self.server.auth_manager.validate_username(username):
+                if not username:
+                    self.send_error_message("Username cannot be empty")
+                elif len(username) > 20:
+                    self.send_error_message("Username too long (max 20 characters)")
+                elif not username.replace(' ', '').replace('_', '').replace('-', '').isalnum():
+                    self.send_error_message("Username contains invalid characters")
+                else:
+                    self.send_error_message("Username already taken")
                 return
             
-            if self.server.is_username_taken(username):
-                self.send_error_message("Username already taken")
+            # Authenticate user through AuthManager
+            if not self.server.auth_manager.authenticate_user(username, self.client_id):
+                self.send_error_message("Authentication failed")
                 return
             
             # Set username and authenticate
@@ -223,6 +232,8 @@ class ClientHandler:
             self.connected = False
             
             if self.is_authenticated and self.username:
+                # Remove from AuthManager
+                self.server.auth_manager.disconnect_user(self.client_id)
                 self.server.remove_client(self.client_id)
             
             self.connection_manager.close()
