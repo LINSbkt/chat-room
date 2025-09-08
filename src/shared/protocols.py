@@ -35,6 +35,43 @@ class Protocol:
             json_data = data[10:10+length].decode('utf-8')
             message_dict = json.loads(json_data)
             
+            # Create the appropriate message type based on message_type
+            message_type_str = message_dict.get('message_type')
+            if message_type_str:
+                from .message_types import MessageType, ChatMessage, SystemMessage, UserListMessage, KeyExchangeMessage, AESKeyMessage, EncryptedMessage
+                
+                message_type = MessageType(message_type_str)
+                
+                # Create the appropriate message class based on type
+                if message_type == MessageType.PUBLIC_MESSAGE or message_type == MessageType.PRIVATE_MESSAGE:
+                    return ChatMessage.from_dict(message_dict)
+                elif message_type == MessageType.SYSTEM_MESSAGE:
+                    return SystemMessage.from_dict(message_dict)
+                elif message_type == MessageType.USER_LIST_RESPONSE:
+                    return UserListMessage.from_dict(message_dict)
+                elif message_type == MessageType.KEY_EXCHANGE_REQUEST:
+                    return KeyExchangeMessage.from_dict(message_dict)
+                elif message_type == MessageType.AES_KEY_EXCHANGE:
+                    return AESKeyMessage.from_dict(message_dict)
+                elif message_type == MessageType.ENCRYPTED_MESSAGE:
+                    return EncryptedMessage.from_dict(message_dict)
+                elif message_type == MessageType.AUTH_RESPONSE:
+                    # AUTH_RESPONSE is a generic Message type
+                    return Message.from_dict(message_dict)
+                elif message_type == MessageType.AUTH_REQUEST:
+                    # AUTH_REQUEST is a generic Message type
+                    return Message.from_dict(message_dict)
+                elif message_type == MessageType.ERROR_MESSAGE:
+                    # ERROR_MESSAGE is a generic Message type
+                    return Message.from_dict(message_dict)
+                elif message_type == MessageType.USER_LIST_REQUEST:
+                    # USER_LIST_REQUEST is a generic Message type
+                    return Message.from_dict(message_dict)
+                elif message_type == MessageType.DISCONNECT:
+                    # DISCONNECT is a generic Message type
+                    return Message.from_dict(message_dict)
+            
+            # Fallback to generic Message
             return Message.from_dict(message_dict)
         except Exception as e:
             raise ValueError(f"Failed to deserialize message: {e}")

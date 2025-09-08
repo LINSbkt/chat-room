@@ -66,6 +66,10 @@ class ClientHandler:
         try:
             self.logger.debug(f"Received message: {message.message_type}")
             
+            # Route all messages through the message router first
+            if self.server.message_router.route_message(message, self):
+                return  # Message was handled by router
+            # Fallback to direct handling for messages not handled by router
             if message.message_type == MessageType.CONNECT:
                 self.handle_connect(message)
             elif message.message_type == MessageType.AUTH_REQUEST:
@@ -93,10 +97,13 @@ class ClientHandler:
     def handle_auth_request(self, message: Message):
         """Handle authentication request."""
         try:
+            print(f"DEBUG: Handling AUTH_REQUEST from client {self.client_id}")
             username = message.data.get('username', '').strip()
+            print(f"DEBUG: Username received: '{username}'")
             
             # Use AuthManager for validation and authentication
             if not self.server.auth_manager.validate_username(username):
+                print(f"DEBUG: Username validation failed for '{username}'")
                 if not username:
                     self.send_error_message("Username cannot be empty")
                 elif len(username) > 20:
@@ -107,10 +114,15 @@ class ClientHandler:
                     self.send_error_message("Username already taken")
                 return
             
+            print(f"DEBUG: Username validation passed for '{username}'")
+            
             # Authenticate user through AuthManager
             if not self.server.auth_manager.authenticate_user(username, self.client_id):
+                print(f"DEBUG: AuthManager authentication failed for '{username}'")
                 self.send_error_message("Authentication failed")
                 return
+            
+            print(f"DEBUG: AuthManager authentication successful for '{username}'")
             
             # Set username and authenticate
             self.username = username
@@ -118,16 +130,20 @@ class ClientHandler:
             
             # Add client to server
             self.server.add_client(self)
+            print(f"DEBUG: Client {self.client_id} added to server")
             
             # Send authentication response
             auth_response = Message(MessageType.AUTH_RESPONSE, {'username': username, 'status': 'success'})
             print(f"DEBUG: Sending AUTH_RESPONSE for user {username}")
-            self.send_message(auth_response)
+            success = self.send_message(auth_response)
+            print(f"DEBUG: AUTH_RESPONSE send result: {success}")
             
             self.send_system_message(f"Welcome {username}!")
             self.logger.info(f"Client {self.client_id} authenticated as {username}")
+            print(f"DEBUG: Authentication process completed for {username}")
             
         except Exception as e:
+            print(f"DEBUG: Exception in handle_auth_request: {e}")
             self.logger.error(f"Authentication error: {e}")
             self.send_error_message("Authentication failed")
     

@@ -11,6 +11,7 @@ try:
     from ..shared.message_types import Message, MessageType, ChatMessage, SystemMessage, UserListMessage
     from ..shared.protocols import ConnectionManager
     from ..shared.exceptions import ConnectionError
+    from .crypto_manager import ClientCryptoManager
 except ImportError:
     import sys
     import os
@@ -18,6 +19,7 @@ except ImportError:
     from shared.message_types import Message, MessageType, ChatMessage, SystemMessage, UserListMessage
     from shared.protocols import ConnectionManager
     from shared.exceptions import ConnectionError
+    from client.crypto_manager import ClientCryptoManager
 
 
 class ChatClient(QObject):
@@ -42,6 +44,7 @@ class ChatClient(QObject):
         self.auth_event = threading.Event()  # Event to signal authentication completion
         self.auth_success = False  # Track authentication success
         self.intentional_disconnect = False  # Track if disconnect is intentional
+        self.crypto_manager = ClientCryptoManager()  # Cryptographic manager
         
         # Setup logging
         logging.basicConfig(level=logging.INFO)
@@ -65,9 +68,18 @@ class ChatClient(QObject):
             self.receive_thread = threading.Thread(target=self._receive_loop, daemon=True)
             self.receive_thread.start()
             
+            # Initialize encryption (but don't send key exchange yet)
+            try:
+                public_key_pem = self.crypto_manager.initialize_encryption()
+                self.logger.info("Encryption initialized, will send key exchange after authentication")
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize encryption: {e}")
+            
             # Send authentication request
             auth_message = Message(MessageType.AUTH_REQUEST, {'username': username})
-            self.connection_manager.send_message(auth_message)
+            print(f"DEBUG: Sending AUTH_REQUEST for username: {username}")
+            success = self.connection_manager.send_message(auth_message)
+            print(f"DEBUG: AUTH_REQUEST send result: {success}")
             
             self.logger.info(f"Connected to server as {username}")
             # Don't emit connection status yet - wait for auth response
@@ -141,11 +153,16 @@ class ChatClient(QObject):
             print(f"DEBUG: Received message type: {message.message_type}")
             if message.message_type == MessageType.AUTH_RESPONSE:
                 # Authentication successful
+                print("DEBUG: Received AUTH_RESPONSE message")
+                print(f"DEBUG: AUTH_RESPONSE data: {message.data}")
                 print("DEBUG: Authentication successful, emitting connection status")
                 self.auth_success = True
                 self.auth_event.set()  # Signal authentication completion
                 self.connection_status_changed.emit(True)
                 self.logger.info("Authentication successful")
+                
+                # Send key exchange after successful authentication
+                self._send_key_exchange()
             elif message.message_type == MessageType.PUBLIC_MESSAGE:
                 self.message_received.emit(message)
             elif message.message_type == MessageType.PRIVATE_MESSAGE:
@@ -164,11 +181,66 @@ class ChatClient(QObject):
                 self.user_list_updated.emit(message.data['users'])
             elif message.message_type == MessageType.ERROR_MESSAGE:
                 self.error_occurred.emit(message.data['content'])
+            elif message.message_type == MessageType.AES_KEY_EXCHANGE:
+                # Handle AES key exchange
+                try:
+                    from ..shared.message_types import AESKeyMessage
+                except ImportError:
+                    from shared.message_types import AESKeyMessage
+                if isinstance(message, AESKeyMessage):
+                    try:
+                        self.crypto_manager.setup_aes_encryption(message.encrypted_aes_key)
+                        self.logger.info("AES encryption setup completed")
+                    except Exception as e:
+                        self.logger.error(f"Failed to setup AES encryption: {e}")
+            elif message.message_type == MessageType.ENCRYPTED_MESSAGE:
+                # Handle encrypted message
+                try:
+                    from ..shared.message_types import EncryptedMessage
+                except ImportError:
+                    from shared.message_types import EncryptedMessage
+                if isinstance(message, EncryptedMessage):
+                    try:
+                        self.logger.info(f"📥 CLIENT RECEIVE: Received encrypted message from {message.sender}")
+                        self.logger.info(f"📥 CLIENT RECEIVE: Encrypted content: {message.encrypted_content}")
+                        self.logger.info(f"📥 CLIENT RECEIVE: Message type: {'Private' if message.is_private else 'Public'}")
+                        
+                        decrypted_content = self.crypto_manager.decrypt_message(message.encrypted_content)
+                        
+                        self.logger.info(f"📥 CLIENT RECEIVE: Successfully decrypted message: '{decrypted_content}'")
+                        
+                        # Create a regular message with decrypted content
+                        decrypted_message = ChatMessage(
+                            decrypted_content,
+                            message.sender,
+                            message.recipient,
+                            message.is_private
+                        )
+                        self.message_received.emit(decrypted_message)
+                        self.logger.info(f"📥 CLIENT RECEIVE: Emitted decrypted message to GUI")
+                    except Exception as e:
+                        self.logger.error(f"Failed to decrypt message: {e}")
             else:
                 self.logger.warning(f"Unknown message type: {message.message_type}")
                 
         except Exception as e:
             self.logger.error(f"Error handling message: {e}")
+    
+    def _send_key_exchange(self):
+        """Send key exchange after successful authentication."""
+        try:
+            if self.crypto_manager.has_rsa_keys():
+                public_key_pem = self.crypto_manager.get_public_key_pem()
+                try:
+                    from ..shared.message_types import KeyExchangeMessage
+                except ImportError:
+                    from shared.message_types import KeyExchangeMessage
+                
+                key_exchange_message = KeyExchangeMessage(public_key_pem, self.username)
+                self.connection_manager.send_message(key_exchange_message)
+                self.logger.info("Key exchange sent after authentication")
+        except Exception as e:
+            self.logger.error(f"Failed to send key exchange: {e}")
     
     def send_public_message(self, content: str) -> bool:
         """Send a public message."""
@@ -176,8 +248,30 @@ class ChatClient(QObject):
             return False
         
         try:
-            message = ChatMessage(content, self.username, is_private=False)
-            return self.connection_manager.send_message(message)
+            self.logger.info(f"📤 CLIENT SEND: Preparing to send public message: '{content}'")
+            
+            # Check if encryption is available
+            if self.crypto_manager.is_ready_for_encryption():
+                self.logger.info(f"📤 CLIENT SEND: Encryption enabled, encrypting message")
+                # Encrypt the message
+                encrypted_content = self.crypto_manager.encrypt_message(content)
+                try:
+                    from ..shared.message_types import EncryptedMessage
+                except ImportError:
+                    from shared.message_types import EncryptedMessage
+                message = EncryptedMessage(encrypted_content, self.username, is_private=False)
+                self.logger.info(f"📤 CLIENT SEND: Sending encrypted public message")
+            else:
+                self.logger.info(f"📤 CLIENT SEND: Encryption not available, sending plaintext")
+                # Send as regular message
+                message = ChatMessage(content, self.username, is_private=False)
+            
+            success = self.connection_manager.send_message(message)
+            if success:
+                self.logger.info(f"📤 CLIENT SEND: Public message sent successfully")
+            else:
+                self.logger.error(f"📤 CLIENT SEND: Failed to send public message")
+            return success
         except Exception as e:
             self.logger.error(f"Failed to send public message: {e}")
             return False
@@ -188,10 +282,30 @@ class ChatClient(QObject):
             return False
         
         try:
-            print(f"DEBUG: Sending private message to {recipient}: {content}")
-            message = ChatMessage(content, self.username, recipient, is_private=True)
-            print(f"DEBUG: Created message: {message.to_dict()}")
-            return self.connection_manager.send_message(message)
+            self.logger.info(f"📤 CLIENT SEND: Preparing to send private message to '{recipient}': '{content}'")
+            
+            # Check if encryption is available
+            if self.crypto_manager.is_ready_for_encryption():
+                self.logger.info(f"📤 CLIENT SEND: Encryption enabled, encrypting private message")
+                # Encrypt the message
+                encrypted_content = self.crypto_manager.encrypt_message(content)
+                try:
+                    from ..shared.message_types import EncryptedMessage
+                except ImportError:
+                    from shared.message_types import EncryptedMessage
+                message = EncryptedMessage(encrypted_content, self.username, recipient, is_private=True)
+                self.logger.info(f"📤 CLIENT SEND: Sending encrypted private message to '{recipient}'")
+            else:
+                self.logger.info(f"📤 CLIENT SEND: Encryption not available, sending plaintext private message")
+                # Send as regular message
+                message = ChatMessage(content, self.username, recipient, is_private=True)
+            
+            success = self.connection_manager.send_message(message)
+            if success:
+                self.logger.info(f"📤 CLIENT SEND: Private message sent successfully to '{recipient}'")
+            else:
+                self.logger.error(f"📤 CLIENT SEND: Failed to send private message to '{recipient}'")
+            return success
         except Exception as e:
             self.logger.error(f"Failed to send private message: {e}")
             return False
