@@ -5,7 +5,7 @@ Client main entry point.
 import sys
 import argparse
 import logging
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QMessageBox
 try:
     from .chat_client import ChatClient
     from .gui.main_window import MainWindow

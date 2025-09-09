@@ -396,6 +396,14 @@ class FileTransferRequest(Message):
     def is_private(self) -> bool:
         return self.data['is_private']
     
+    @property
+    def transfer_id(self) -> Optional[str]:
+        return self.data.get('transfer_id')
+    
+    def set_transfer_id(self, transfer_id: str):
+        """Set the transfer ID for this request."""
+        self.data['transfer_id'] = transfer_id
+    
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'FileTransferRequest':
         """Create FileTransferRequest from dictionary."""
@@ -413,6 +421,10 @@ class FileTransferRequest(Message):
             recipient=data['recipient'],
             is_private=data['data']['is_private']
         )
+        
+        # Set transfer_id if provided
+        if 'transfer_id' in data['data'] and data['data']['transfer_id']:
+            message.set_transfer_id(data['data']['transfer_id'])
         
         # Set timestamp if provided
         if timestamp:

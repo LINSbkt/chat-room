@@ -9,7 +9,7 @@ setup(
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     install_requires=[
-        "PyQt6>=6.4.0",
+        "PySide6>=6.9.0",
         "cryptography>=3.4.8",
         "pytest>=7.0.0",
         "pytest-qt>=4.0.0",
