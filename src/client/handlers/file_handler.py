@@ -228,7 +228,8 @@ class FileHandler:
             success = self.client_core.send_message(complete_message)
             if success:
                 self.logger.info(f"📤 File transfer completed: {transfer['filename']}")
-                self.client_core.signals.file_transfer_complete.emit(transfer_id, True, transfer['file_path'])
+                # Don't emit file_transfer_complete signal for sender - this is only for recipients
+                # The recipient will receive the FileTransferComplete message and handle the GUI notification
             
             self.client_core.file_transfer_manager.cleanup_transfer(transfer_id)
         except Exception as e:
@@ -256,7 +257,8 @@ class FileHandler:
             
             else:
                 self.logger.error(f"❌ File transfer failed: {transfer_id}")
-                self.client_core.signals.file_transfer_complete.emit(transfer_id, False, "Failed to complete file transfer")
+                # Don't emit file_transfer_complete signal for sender - this is only for recipients
+                # The recipient will receive the FileTransferComplete message and handle the GUI notification
                 
                 complete_message = FileTransferComplete(transfer_id, False, 
                                                       error_message="Failed to complete transfer", 
@@ -266,4 +268,5 @@ class FileHandler:
             self.client_core.file_transfer_manager.cleanup_transfer(transfer_id)
         except Exception as e:
             self.logger.error(f"Error completing file transfer: {e}")
-            self.client_core.signals.file_transfer_complete.emit(transfer_id, False, str(e))
+            # Don't emit file_transfer_complete signal for sender - this is only for recipients
+            # The recipient will receive the FileTransferComplete message and handle the GUI notification
