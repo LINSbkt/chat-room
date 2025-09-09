@@ -57,6 +57,9 @@ class FileTransferServerManager:
                     if sender_username not in transfer_info['accepted_by']:
                         transfer_info['accepted_by'].append(sender_username)
                         self.logger.info(f"📋 Added {sender_username} to GLOBAL transfer {transfer_id} recipients")
+                        self.logger.info(f"📋 Current accepted recipients: {transfer_info['accepted_by']}")
+                    else:
+                        self.logger.info(f"📋 User {sender_username} already in GLOBAL transfer {transfer_id} recipients")
                 elif transfer_info['recipient'] == 'GLOBAL' and not message.accepted:
                     self.logger.info(f"📋 User {sender_username} declined GLOBAL transfer {transfer_id}")
                 
@@ -102,6 +105,8 @@ class FileTransferServerManager:
                         # For GLOBAL transfers, send to all users who accepted
                         accepted_recipients = transfer_info['accepted_by']
                         
+                        self.logger.info(f"📦 Forwarding GLOBAL chunk to accepted recipients: {accepted_recipients}")
+                        
                         if not accepted_recipients:
                             self.logger.warning(f"Cannot forward chunk to GLOBAL - no users have accepted yet")
                             return False
@@ -113,12 +118,13 @@ class FileTransferServerManager:
                                 success = recipient_handler.send_message(message)
                                 if success:
                                     success_count += 1
-                                    self.logger.debug(f"📦 Forwarded file chunk to {recipient}")
+                                    self.logger.info(f"📦 ✓ Forwarded file chunk to {recipient}")
                                 else:
-                                    self.logger.error(f"Failed to send chunk to {recipient}")
+                                    self.logger.error(f"📦 ✗ Failed to send chunk to {recipient}")
                             else:
-                                self.logger.warning(f"Recipient {recipient} not found")
+                                self.logger.warning(f"📦 Recipient {recipient} not found")
                         
+                        self.logger.info(f"📦 GLOBAL chunk forwarded to {success_count}/{len(accepted_recipients)} recipients")
                         return success_count > 0
                     else:
                         # Private transfer to single recipient
