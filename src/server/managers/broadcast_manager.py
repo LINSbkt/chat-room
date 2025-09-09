@@ -68,11 +68,17 @@ class BroadcastManager:
         success_count = 0
         total_clients = 0
         
-        for client_handler in self.server.client_manager.active_clients.values():
-            if client_handler.username and client_handler.username != exclude_user:
-                total_clients += 1
-                if client_handler.send_message(message):
-                    success_count += 1
+        self.logger.info(f"📤 Broadcasting file transfer request, excluding user: {exclude_user}")
         
-        self.logger.info(f"📤 Broadcasted file transfer request to {success_count}/{total_clients} clients")
+        for client_handler in self.server.client_manager.active_clients.values():
+            if client_handler.username:
+                if client_handler.username != exclude_user:
+                    total_clients += 1
+                    self.logger.debug(f"📤 Sending file transfer request to {client_handler.username}")
+                    if client_handler.send_message(message):
+                        success_count += 1
+                else:
+                    self.logger.debug(f"📤 Excluding sender {client_handler.username} from file transfer request")
+        
+        self.logger.info(f"📤 Broadcasted file transfer request to {success_count}/{total_clients} clients (excluded: {exclude_user})")
         return success_count > 0
