@@ -31,6 +31,8 @@ class MessageRouter:
             # MessageType.PRIVATE_MESSAGE: self.handle_private_message,
             # USER_LIST_REQUEST is handled directly in ClientHandler
             # MessageType.USER_LIST_REQUEST: self.handle_user_list_request,
+            # FILE_TRANSFER_REQUEST is handled directly in ClientHandler
+            # MessageType.FILE_TRANSFER_REQUEST: self.handle_file_transfer_request,
             MessageType.KEY_EXCHANGE_REQUEST: self.handle_key_exchange_request,
             MessageType.AES_KEY_EXCHANGE: self.handle_aes_key_exchange,
             MessageType.ENCRYPTED_MESSAGE: self.handle_encrypted_message,
@@ -47,9 +49,14 @@ class MessageRouter:
                 # Don't log warning for messages handled directly by client handler
                 expected_direct_handlers = {
                     MessageType.AUTH_REQUEST,
+                    MessageType.AUTH_RESPONSE,
                     MessageType.PUBLIC_MESSAGE,
                     MessageType.PRIVATE_MESSAGE,
-                    MessageType.USER_LIST_REQUEST
+                    MessageType.USER_LIST_REQUEST,
+                    MessageType.FILE_TRANSFER_REQUEST,
+                    MessageType.FILE_TRANSFER_RESPONSE,
+                    MessageType.FILE_CHUNK,
+                    MessageType.FILE_TRANSFER_COMPLETE
                 }
                 if message.message_type not in expected_direct_handlers:
                     self.logger.warning(f"No handler for message type: {message.message_type}")
@@ -161,12 +168,43 @@ class MessageRouter:
                 
                 self.logger.info(f"🔐 ROUTER: Decrypted message: '{decrypted_content}'")
                 
-                # Route the decrypted message normally through client handler
+                # Route the decrypted message through the proper handler structure
                 if message.is_private:
                     self.logger.info(f"🔐 ROUTER: Routing decrypted private message to recipient: {message.recipient}")
-                    client_handler.handle_private_message(decrypted_message)
+                    # Create a PRIVATE_MESSAGE message and route it through the handler
+                    try:
+                        from ..shared.message_types import Message, MessageType
+                    except ImportError:
+                        import sys
+                        import os
+                        sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+                        from shared.message_types import Message, MessageType
+                    
+                    private_msg = Message(MessageType.PRIVATE_MESSAGE, {
+                        'content': decrypted_content,
+                        'recipient': message.recipient
+                    })
+                    # Call chat handler directly to avoid recursion
+                    from .handlers.server_chat_handler import ServerChatHandler
+                    chat_handler = ServerChatHandler(client_handler)
+                    chat_handler.handle_private_message(private_msg)
                 else:
                     self.logger.info(f"🔐 ROUTER: Routing decrypted public message for broadcast")
-                    client_handler.handle_public_message(decrypted_message)
+                    # Create a PUBLIC_MESSAGE message and route it through the handler  
+                    try:
+                        from ..shared.message_types import Message, MessageType
+                    except ImportError:
+                        import sys
+                        import os
+                        sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+                        from shared.message_types import Message, MessageType
+                    
+                    public_msg = Message(MessageType.PUBLIC_MESSAGE, {
+                        'content': decrypted_content
+                    })
+                    # Call chat handler directly to avoid recursion
+                    from .handlers.server_chat_handler import ServerChatHandler
+                    chat_handler = ServerChatHandler(client_handler)
+                    chat_handler.handle_public_message(public_msg)
         except Exception as e:
             self.logger.error(f"Error handling encrypted message: {e}")

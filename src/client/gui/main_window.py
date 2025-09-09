@@ -3,22 +3,28 @@ Main window GUI for the chat client.
 """
 
 import sys
+import os
+import subprocess
+import platform
 from datetime import datetime
-from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
+from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                             QTextEdit, QLineEdit, QPushButton, QListWidget, 
                             QLabel, QSplitter, QMessageBox, QApplication,
-                            QComboBox, QCheckBox)
-from PyQt6.QtCore import Qt, pyqtSlot
-from PyQt6.QtGui import QFont, QColor
+                            QComboBox, QCheckBox, QFileDialog, QProgressBar,
+                            QListWidgetItem)
+from PySide6.QtCore import Qt, Slot, QUrl
+from PySide6.QtGui import QFont, QColor, QDesktopServices
 try:
     from ..chat_client import ChatClient
-    from ..shared.message_types import MessageType, ChatMessage
+    from ...shared.messages.enums import MessageType
+    from ...shared.messages.chat import ChatMessage
 except ImportError:
     import sys
     import os
     sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
     from client.chat_client import ChatClient
-    from shared.message_types import MessageType, ChatMessage
+    from shared.messages.enums import MessageType
+    from shared.messages.chat import ChatMessage
 
 
 class MainWindow(QMainWindow):
@@ -87,6 +93,11 @@ class MainWindow(QMainWindow):
         self.send_button.clicked.connect(self.send_message)
         input_layout.addWidget(self.send_button)
         
+        # File transfer button
+        self.file_button = QPushButton("📁 Send File")
+        self.file_button.clicked.connect(self.send_file)
+        input_layout.addWidget(self.file_button)
+        
         chat_layout.addLayout(input_layout)
         
         # Right panel - User list
@@ -96,6 +107,29 @@ class MainWindow(QMainWindow):
         user_layout.addWidget(QLabel("Online Users:"))
         self.user_list = QListWidget()
         user_layout.addWidget(self.user_list)
+        
+        # File transfer progress area
+        user_layout.addWidget(QLabel("File Transfers:"))
+        self.file_transfer_list = QListWidget()
+        self.file_transfer_list.setMaximumHeight(100)
+        self.file_transfer_list.itemDoubleClicked.connect(self.on_file_transfer_item_clicked)
+        user_layout.addWidget(self.file_transfer_list)
+        
+        # Downloads area
+        downloads_layout = QHBoxLayout()
+        downloads_layout.addWidget(QLabel("Downloads:"))
+        self.open_downloads_button = QPushButton("📂 Open Folder")
+        self.open_downloads_button.clicked.connect(self.open_downloads_folder)
+        downloads_layout.addWidget(self.open_downloads_button)
+        user_layout.addLayout(downloads_layout)
+        
+        self.downloads_list = QListWidget()
+        self.downloads_list.setMaximumHeight(100)
+        self.downloads_list.itemDoubleClicked.connect(self.on_download_item_clicked)
+        user_layout.addWidget(self.downloads_list)
+        
+        # Load existing downloads
+        self.load_existing_downloads()
         
         # Add widgets to splitter
         splitter.addWidget(chat_widget)
@@ -125,6 +159,11 @@ class MainWindow(QMainWindow):
         chat_client.error_occurred.connect(self.on_error_occurred)
         chat_client.connection_status_changed.connect(self.on_connection_status_changed)
         
+        # Connect file transfer signals
+        chat_client.file_transfer_request.connect(self.on_file_transfer_request)
+        chat_client.file_transfer_progress.connect(self.on_file_transfer_progress)
+        chat_client.file_transfer_complete.connect(self.on_file_transfer_complete)
+        
         print("DEBUG: All signals connected")
         
         # Check if already connected and update status accordingly
@@ -139,7 +178,7 @@ class MainWindow(QMainWindow):
         print("DEBUG: Requesting user list")
         chat_client.request_user_list()
     
-    @pyqtSlot(object)
+    @Slot(object)
     def on_message_received(self, message):
         """Handle received message."""
         if message.message_type == MessageType.PUBLIC_MESSAGE:
@@ -207,7 +246,7 @@ class MainWindow(QMainWindow):
         self.message_display.setTextColor(QColor(0, 0, 0))  # Reset to black
         self.scroll_to_bottom()
     
-    @pyqtSlot(list)
+    @Slot(list)
     def on_user_list_updated(self, users):
         """Handle user list update."""
         print(f"DEBUG: User list updated with {len(users)} users: {users}")
@@ -234,7 +273,7 @@ class MainWindow(QMainWindow):
             self.user_list.addItem(item_text)
             print(f"DEBUG: Added user to list: {user}")
     
-    @pyqtSlot(str)
+    @Slot(str)
     def on_system_message(self, message):
         """Handle system message."""
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -253,7 +292,7 @@ class MainWindow(QMainWindow):
         self.message_display.setTextColor(QColor(0, 0, 0))  # Reset to black
         self.scroll_to_bottom()
     
-    @pyqtSlot(str)
+    @Slot(str)
     def on_error_occurred(self, error_message):
         """Handle error message."""
         print(f"DEBUG: Error occurred: {error_message}")
@@ -269,7 +308,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Error", error_message)
             self.status_label.setText(f"Error: {error_message}")
     
-    @pyqtSlot(bool)
+    @Slot(bool)
     def on_connection_status_changed(self, connected):
         """Handle connection status change."""
         print(f"DEBUG: Connection status changed to: {connected}")
@@ -277,11 +316,13 @@ class MainWindow(QMainWindow):
             self.status_label.setText("Connected")
             self.send_button.setEnabled(True)
             self.message_input.setEnabled(True)
-            print("DEBUG: UI enabled for sending messages")
+            self.file_button.setEnabled(True)
+            print("DEBUG: UI enabled for sending messages and files")
         else:
             self.status_label.setText("Disconnected")
             self.send_button.setEnabled(False)
             self.message_input.setEnabled(False)
+            self.file_button.setEnabled(False)
             print("DEBUG: UI disabled - not connected")
     
     def on_message_type_changed(self, message_type: str):
@@ -339,6 +380,198 @@ class MainWindow(QMainWindow):
         """Scroll message display to bottom."""
         scrollbar = self.message_display.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
+    
+    def send_file(self):
+        """Send a file to a user."""
+        if not self.chat_client or not self.chat_client.connected:
+            QMessageBox.warning(self, "Error", "Not connected to server")
+            return
+        
+        # Get recipient - allow global file transfers
+        message_type = self.message_type_combo.currentText()
+        if message_type == "Public":
+            recipient = "GLOBAL"  # Send to all users
+        else:
+            recipient = self.recipient_combo.currentText()
+            if not recipient:
+                QMessageBox.warning(self, "Error", "Please select a recipient for private file transfer")
+                return
+        
+        # Open file dialog
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, 
+            "Select File to Send", 
+            "", 
+            "All Files (*.*)"
+        )
+        
+        if file_path:
+            # Send the file
+            success = self.chat_client.send_file(file_path, recipient)
+            if success:
+                filename = file_path.split('/')[-1] if '/' in file_path else file_path.split('\\')[-1]
+                self.display_system_message(f"📤 Sending file '{filename}' to {recipient}...")
+            else:
+                QMessageBox.warning(self, "Error", "Failed to send file")
+    
+    @Slot(object)
+    def on_file_transfer_request(self, request):
+        """Handle incoming file transfer request."""
+        filename = request.filename  # Use property, not data dict
+        sender = request.sender or 'Unknown user'
+        file_size = request.file_size  # Use property, not data dict
+        
+        # Format file size
+        if file_size > 1024 * 1024:
+            size_str = f"{file_size / (1024 * 1024):.1f} MB"
+        elif file_size > 1024:
+            size_str = f"{file_size / 1024:.1f} KB"
+        else:
+            size_str = f"{file_size} bytes"
+        
+        # Show dialog asking user to accept or decline
+        reply = QMessageBox.question(
+            self, 
+            "File Transfer Request", 
+            f"{sender} wants to send you a file:\n\n"
+            f"📁 {filename}\n"
+            f"📏 Size: {size_str}\n\n"
+            f"Do you want to accept this file?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            # Accept the file transfer
+            transfer_id = request.transfer_id or request.message_id  # Use property
+            self.chat_client.accept_file_transfer(transfer_id)
+            self.display_system_message(f"📥 Accepting file '{filename}' from {sender}")
+        else:
+            # Decline the file transfer
+            transfer_id = request.transfer_id or request.message_id  # Use property
+            self.chat_client.decline_file_transfer(transfer_id)
+            self.display_system_message(f"❌ Declined file '{filename}' from {sender}")
+    
+    @Slot(str, int, int)
+    def on_file_transfer_progress(self, transfer_id, current, total):
+        """Handle file transfer progress update."""
+        progress_percent = (current / total * 100) if total > 0 else 0
+        
+        # Update or add progress item in file transfer list
+        for i in range(self.file_transfer_list.count()):
+            item = self.file_transfer_list.item(i)
+            if transfer_id in item.text():
+                item.setText(f"📁 {transfer_id}: {progress_percent:.1f}% ({current}/{total})")
+                break
+        else:
+            # Add new item if not found
+            self.file_transfer_list.addItem(f"📁 {transfer_id}: {progress_percent:.1f}% ({current}/{total})")
+    
+    @Slot(str, bool, str)
+    def on_file_transfer_complete(self, transfer_id, success, file_path):
+        """Handle file transfer completion."""
+        
+        # Remove progress item
+        for i in range(self.file_transfer_list.count()):
+            item = self.file_transfer_list.item(i)
+            if transfer_id in item.text():
+                self.file_transfer_list.takeItem(i)
+                break
+        
+        if success and file_path:
+            filename = file_path.split('/')[-1] if '/' in file_path else file_path.split('\\')[-1]
+            self.display_system_message(f"✅ File transfer completed: {filename}")
+            
+            # Add to downloads list
+            self.add_to_downloads_list(filename, file_path)
+            
+            # Show success message with option to open file
+            reply = QMessageBox.question(
+                self, 
+                "File Transfer Complete", 
+                f"File '{filename}' has been downloaded successfully!\n\nWould you like to open it?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                self.open_file(file_path)
+        else:
+            self.display_system_message(f"❌ File transfer failed: {transfer_id}")
+    
+    def display_system_message(self, message):
+        """Display a system message in the chat."""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        formatted_message = f"(System) ({timestamp}) {message}"
+        
+        # Add to display with color coding
+        self.message_display.setTextColor(QColor(0, 0, 150))  # Blue for system messages
+        self.message_display.append(formatted_message)
+        self.message_display.setTextColor(QColor(0, 0, 0))  # Reset to black
+        self.scroll_to_bottom()
+    
+    def add_to_downloads_list(self, filename, file_path):
+        """Add a file to the downloads list."""
+        # Create a custom item with file path stored as data
+        item = QListWidgetItem(f"📄 {filename}")
+        item.setData(Qt.ItemDataRole.UserRole, file_path)
+        item.setToolTip(f"Double-click to open\nPath: {file_path}")
+        self.downloads_list.addItem(item)
+    
+    def open_file(self, file_path):
+        """Open a file using the system default application."""
+        try:
+            if os.path.exists(file_path):
+                if platform.system() == 'Windows':
+                    os.startfile(file_path)
+                elif platform.system() == 'Darwin':  # macOS
+                    subprocess.run(['open', file_path])
+                else:  # Linux
+                    subprocess.run(['xdg-open', file_path])
+            else:
+                QMessageBox.warning(self, "File Not Found", f"The file could not be found:\n{file_path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error Opening File", f"Could not open file:\n{str(e)}")
+    
+    def open_downloads_folder(self):
+        """Open the downloads folder in the system file manager."""
+        downloads_dir = os.path.join(os.getcwd(), "downloads")
+        
+        # Create downloads directory if it doesn't exist
+        os.makedirs(downloads_dir, exist_ok=True)
+        
+        try:
+            if platform.system() == 'Windows':
+                os.startfile(downloads_dir)
+            elif platform.system() == 'Darwin':  # macOS
+                subprocess.run(['open', downloads_dir])
+            else:  # Linux
+                subprocess.run(['xdg-open', downloads_dir])
+        except Exception as e:
+            QMessageBox.critical(self, "Error Opening Folder", f"Could not open downloads folder:\n{str(e)}")
+    
+    def on_file_transfer_item_clicked(self, item):
+        """Handle double-click on file transfer item."""
+        # This could be used to show more details about the transfer
+        pass
+    
+    def on_download_item_clicked(self, item):
+        """Handle double-click on download item."""
+        file_path = item.data(Qt.ItemDataRole.UserRole)
+        if file_path:
+            self.open_file(file_path)
+    
+    def load_existing_downloads(self):
+        """Load existing files from the downloads folder."""
+        downloads_dir = os.path.join(os.getcwd(), "downloads")
+        
+        if os.path.exists(downloads_dir):
+            try:
+                for filename in os.listdir(downloads_dir):
+                    file_path = os.path.join(downloads_dir, filename)
+                    if os.path.isfile(file_path):
+                        self.add_to_downloads_list(filename, file_path)
+            except Exception as e:
+                print(f"Error loading existing downloads: {e}")
     
     def closeEvent(self, event):
         """Handle window close event."""

@@ -38,7 +38,9 @@ class Protocol:
             # Create the appropriate message type based on message_type
             message_type_str = message_dict.get('message_type')
             if message_type_str:
-                from .message_types import MessageType, ChatMessage, SystemMessage, UserListMessage, KeyExchangeMessage, AESKeyMessage, EncryptedMessage
+                from .message_types import (MessageType, ChatMessage, SystemMessage, UserListMessage, 
+                                          KeyExchangeMessage, AESKeyMessage, EncryptedMessage,
+                                          FileTransferRequest, FileTransferResponse, FileChunk, FileTransferComplete)
                 
                 message_type = MessageType(message_type_str)
                 
@@ -55,6 +57,14 @@ class Protocol:
                     return AESKeyMessage.from_dict(message_dict)
                 elif message_type == MessageType.ENCRYPTED_MESSAGE:
                     return EncryptedMessage.from_dict(message_dict)
+                elif message_type == MessageType.FILE_TRANSFER_REQUEST:
+                    return FileTransferRequest.from_dict(message_dict)
+                elif message_type == MessageType.FILE_TRANSFER_RESPONSE:
+                    return FileTransferResponse.from_dict(message_dict)
+                elif message_type == MessageType.FILE_CHUNK:
+                    return FileChunk.from_dict(message_dict)
+                elif message_type == MessageType.FILE_TRANSFER_COMPLETE:
+                    return FileTransferComplete.from_dict(message_dict)
                 elif message_type == MessageType.AUTH_RESPONSE:
                     # AUTH_RESPONSE is a generic Message type
                     return Message.from_dict(message_dict)

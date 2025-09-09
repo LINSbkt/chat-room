@@ -2,17 +2,17 @@
 Login dialog for username input.
 """
 
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                             QLineEdit, QPushButton, QMessageBox, QTextEdit)
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFont
 
 
 class LoginDialog(QDialog):
     """Login dialog for username input."""
     
     # Signal emitted when login is attempted
-    login_attempted = pyqtSignal(str)
+    login_attempted = Signal(str)
     
     def __init__(self, parent=None):
         super().__init__(parent)
