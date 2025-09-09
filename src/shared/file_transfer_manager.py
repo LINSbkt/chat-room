@@ -114,8 +114,12 @@ class FileTransferManager:
         """Start an incoming file transfer."""
         try:
             # Create downloads directory if it doesn't exist
-            downloads_dir = os.path.join(os.getcwd(), "downloads")
+            # Use a more predictable location - relative to the project root
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))  # Go up 3 levels from src/shared/
+            downloads_dir = os.path.join(project_root, "downloads")
             os.makedirs(downloads_dir, exist_ok=True)
+            
+            self.logger.info(f"📁 Downloads directory: {downloads_dir}")
             
             # Generate unique filename to avoid conflicts
             base_name, ext = os.path.splitext(filename)
