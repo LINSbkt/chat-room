@@ -7,13 +7,13 @@ import os
 import subprocess
 import platform
 from datetime import datetime
-from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
+from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                             QTextEdit, QLineEdit, QPushButton, QListWidget, 
                             QLabel, QSplitter, QMessageBox, QApplication,
                             QComboBox, QCheckBox, QFileDialog, QProgressBar,
                             QListWidgetItem)
-from PyQt6.QtCore import Qt, pyqtSlot, QUrl
-from PyQt6.QtGui import QFont, QColor, QDesktopServices
+from PySide6.QtCore import Qt, Slot, QUrl
+from PySide6.QtGui import QFont, QColor, QDesktopServices
 try:
     from ..chat_client import ChatClient
     from ..shared.message_types import MessageType, ChatMessage
@@ -176,7 +176,7 @@ class MainWindow(QMainWindow):
         print("DEBUG: Requesting user list")
         chat_client.request_user_list()
     
-    @pyqtSlot(object)
+    @Slot(object)
     def on_message_received(self, message):
         """Handle received message."""
         if message.message_type == MessageType.PUBLIC_MESSAGE:
@@ -244,7 +244,7 @@ class MainWindow(QMainWindow):
         self.message_display.setTextColor(QColor(0, 0, 0))  # Reset to black
         self.scroll_to_bottom()
     
-    @pyqtSlot(list)
+    @Slot(list)
     def on_user_list_updated(self, users):
         """Handle user list update."""
         print(f"DEBUG: User list updated with {len(users)} users: {users}")
@@ -271,7 +271,7 @@ class MainWindow(QMainWindow):
             self.user_list.addItem(item_text)
             print(f"DEBUG: Added user to list: {user}")
     
-    @pyqtSlot(str)
+    @Slot(str)
     def on_system_message(self, message):
         """Handle system message."""
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -290,7 +290,7 @@ class MainWindow(QMainWindow):
         self.message_display.setTextColor(QColor(0, 0, 0))  # Reset to black
         self.scroll_to_bottom()
     
-    @pyqtSlot(str)
+    @Slot(str)
     def on_error_occurred(self, error_message):
         """Handle error message."""
         print(f"DEBUG: Error occurred: {error_message}")
@@ -306,7 +306,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Error", error_message)
             self.status_label.setText(f"Error: {error_message}")
     
-    @pyqtSlot(bool)
+    @Slot(bool)
     def on_connection_status_changed(self, connected):
         """Handle connection status change."""
         print(f"DEBUG: Connection status changed to: {connected}")
@@ -412,7 +412,7 @@ class MainWindow(QMainWindow):
             else:
                 QMessageBox.warning(self, "Error", "Failed to send file")
     
-    @pyqtSlot(object)
+    @Slot(object)
     def on_file_transfer_request(self, request):
         """Handle incoming file transfer request."""
         print(f"DEBUG: GUI received file transfer request signal!")
@@ -451,7 +451,7 @@ class MainWindow(QMainWindow):
             self.chat_client.decline_file_transfer(transfer_id)
             self.display_system_message(f"❌ Declined file '{filename}' from {sender}")
     
-    @pyqtSlot(str, int, int)
+    @Slot(str, int, int)
     def on_file_transfer_progress(self, transfer_id, current, total):
         """Handle file transfer progress update."""
         progress_percent = (current / total * 100) if total > 0 else 0
@@ -466,7 +466,7 @@ class MainWindow(QMainWindow):
             # Add new item if not found
             self.file_transfer_list.addItem(f"📁 {transfer_id}: {progress_percent:.1f}% ({current}/{total})")
     
-    @pyqtSlot(str, bool, str)
+    @Slot(str, bool, str)
     def on_file_transfer_complete(self, transfer_id, success, file_path):
         """Handle file transfer completion."""
         

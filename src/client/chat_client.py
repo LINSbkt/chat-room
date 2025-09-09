@@ -6,7 +6,7 @@ import socket
 import threading
 import logging
 from typing import Optional
-from PyQt6.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal as pyqtSignal
 try:
     from ..shared.message_types import (Message, MessageType, ChatMessage, SystemMessage, UserListMessage,
                                       FileTransferRequest, FileTransferResponse, FileChunk, FileTransferComplete)
@@ -632,3 +632,108 @@ class ChatClient(QObject):
         except Exception as e:
             self.logger.error(f"Error completing file transfer: {e}")
             self.file_transfer_complete.emit(transfer_id, False, str(e))
+    
+    def _handle_file_transfer_request(self, message):
+        """Handle incoming file transfer request."""
+        try:
+            self.logger.info(f"📩 Received file transfer request: {message.filename} from {message.sender}")
+            # Emit signal to GUI for user decision
+            self.file_transfer_request.emit(message)
+        except Exception as e:
+            self.logger.error(f"Error handling file transfer request: {e}")
+    
+    def _handle_file_transfer_response(self, message):
+        """Handle file transfer response (accept/decline)."""
+        try:
+            if message.accepted:
+                self.logger.info(f"✅ File transfer accepted: {message.transfer_id}")
+                # Start sending chunks
+                self._send_file_chunks(message.transfer_id)
+            else:
+                self.logger.info(f"❌ File transfer declined: {message.transfer_id} - {message.reason}")
+                # Clean up the transfer
+                self.file_transfer_manager.cleanup_transfer(message.transfer_id)
+                self.system_message.emit(f"File transfer declined: {message.reason}")
+        except Exception as e:
+            self.logger.error(f"Error handling file transfer response: {e}")
+    
+    def _handle_file_chunk(self, message):
+        """Handle incoming file chunk."""
+        try:
+            self.logger.debug(f"📦 Received chunk {message.chunk_index + 1}/{message.total_chunks} for transfer {message.transfer_id}")
+            
+            # Add chunk to transfer
+            success = self.file_transfer_manager.add_chunk_to_transfer(
+                message.transfer_id, message.chunk_index, message.chunk_data
+            )
+            
+            if success:
+                # Update progress
+                transfer = self.file_transfer_manager.get_transfer_status(message.transfer_id)
+                if transfer:
+                    # Set total chunks if not set
+                    if transfer['total_chunks'] == 0:
+                        self.file_transfer_manager.active_transfers[message.transfer_id]['total_chunks'] = message.total_chunks
+                    
+                    self.file_transfer_progress.emit(
+                        message.transfer_id, 
+                        transfer['received_chunks'],
+                        message.total_chunks
+                    )
+                    
+                    # Check if transfer is complete
+                    if transfer['received_chunks'] >= message.total_chunks:
+                        self._complete_incoming_transfer(message.transfer_id)
+            else:
+                self.logger.error(f"Failed to add chunk {message.chunk_index} to transfer {message.transfer_id}")
+                
+        except Exception as e:
+            self.logger.error(f"Error handling file chunk: {e}")
+    
+    def _handle_file_transfer_complete(self, message):
+        """Handle file transfer completion notification."""
+        try:
+            if message.success:
+                self.logger.info(f"✅ File transfer completed successfully: {message.transfer_id}")
+            else:
+                self.logger.error(f"❌ File transfer failed: {message.transfer_id} - {message.error_message}")
+            
+            # Emit completion signal
+            self.file_transfer_complete.emit(message.transfer_id, message.success, 
+                                           message.error_message or "Transfer completed")
+            
+            # Clean up
+            self.file_transfer_manager.cleanup_transfer(message.transfer_id)
+            
+        except Exception as e:
+            self.logger.error(f"Error handling file transfer complete: {e}")
+    
+    def respond_to_file_transfer(self, transfer_id: str, accept: bool, reason: str = "", request_message=None):
+        """Respond to a file transfer request."""
+        try:
+            response = FileTransferResponse(transfer_id, accept, reason or ("Accepted" if accept else "Declined"), 
+                                          self.username, "")  # recipient will be set by server
+            success = self.connection_manager.send_message(response)
+            
+            if success:
+                self.logger.info(f"📤 File transfer response sent: {'Accepted' if accept else 'Declined'}")
+                if accept and request_message:
+                    # Setup incoming transfer
+                    self.file_transfer_manager.start_incoming_transfer(
+                        transfer_id, 
+                        request_message.filename,
+                        request_message.file_size,
+                        request_message.file_hash,
+                        request_message.sender,
+                        self.username
+                    )
+                    self.logger.info(f"📥 Incoming transfer setup complete for {request_message.filename}")
+            else:
+                self.logger.error("Failed to send file transfer response")
+                return False
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error responding to file transfer: {e}")
+            return False

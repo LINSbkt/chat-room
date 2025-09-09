@@ -43,6 +43,7 @@ class ChatServer:
         self.auth_manager = AuthManager()
         self.crypto_manager = ServerCryptoManager()
         self.file_transfer_manager = FileTransferManager()
+        self.active_file_transfers = {}  # transfer_id -> {'sender': username, 'recipient': username}
         self.running = False
         self.server_socket: Optional[socket.socket] = None
         
@@ -194,19 +195,30 @@ class ChatServer:
         try:
             transfer_id = message.transfer_id
             
-            # Find the original sender by looking through all clients
-            for client_handler in self.active_clients.values():
-                if client_handler.username and client_handler.username != sender_username:
-                    # Check if this client has an active transfer with this ID
-                    if hasattr(client_handler, 'file_transfer_manager') and client_handler.file_transfer_manager:
-                        if transfer_id in client_handler.file_transfer_manager.active_transfers:
-                            success = client_handler.send_message(message)
-                            if success:
-                                self.logger.info(f"📤 Forwarded file transfer response to {client_handler.username}")
-                            return success
-            
-            self.logger.warning(f"Could not find original sender for transfer {transfer_id}")
-            return False
+            # Look up the transfer in our tracking
+            if transfer_id in self.active_file_transfers:
+                transfer_info = self.active_file_transfers[transfer_id]
+                original_sender = transfer_info['sender']
+                
+                # Find the original sender client
+                sender_handler = self.get_client_by_username(original_sender)
+                if sender_handler:
+                    success = sender_handler.send_message(message)
+                    if success:
+                        self.logger.info(f"📤 Forwarded file transfer response to {original_sender}")
+                        # Keep tracking for potential chunk transfers
+                        return True
+                    else:
+                        self.logger.error(f"Failed to send file transfer response to {original_sender}")
+                        return False
+                else:
+                    self.logger.warning(f"Original sender {original_sender} not found")
+                    # Clean up the transfer since sender is gone
+                    del self.active_file_transfers[transfer_id]
+                    return False
+            else:
+                self.logger.warning(f"Transfer {transfer_id} not found in active transfers")
+                return False
             
         except Exception as e:
             self.logger.error(f"Error forwarding file transfer response: {e}")

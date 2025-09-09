@@ -288,7 +288,16 @@ class ClientHandler:
                 # Forward the request to the recipient
                 success = recipient_handler.send_message(message)
                 if success:
-                    self.logger.info(f"📤 Forwarded file transfer request to {message.recipient}")
+                    # Track the file transfer
+                    transfer_id = message.transfer_id
+                    if transfer_id:
+                        self.server.active_file_transfers[transfer_id] = {
+                            'sender': self.username,
+                            'recipient': message.recipient
+                        }
+                        self.logger.info(f"📤 Forwarded file transfer request to {message.recipient}, tracking transfer {transfer_id}")
+                    else:
+                        self.logger.info(f"📤 Forwarded file transfer request to {message.recipient}")
                 else:
                     self.send_error_message("Failed to send file transfer request")
                 
