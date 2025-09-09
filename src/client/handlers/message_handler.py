@@ -10,6 +10,9 @@ from .file_handler import FileHandler
 try:
     from ...shared.message_types import MessageType
 except ImportError:
+    import sys
+    import os
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
     from shared.message_types import MessageType
 
 

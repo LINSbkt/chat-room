@@ -8,6 +8,9 @@ try:
     from ...shared.message_types import (FileTransferRequest, FileTransferResponse, 
                                        FileChunk, FileTransferComplete)
 except ImportError:
+    import sys
+    import os
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
     from shared.message_types import (FileTransferRequest, FileTransferResponse, 
                                     FileChunk, FileTransferComplete)
 
@@ -42,7 +45,10 @@ class FileHandler:
                         self.client_core.signals.system_message.emit(f"📥 Receiving file: {message.filename} from {message.sender}")
                         
                         # Send acceptance response immediately
-                        from ...shared.message_types import FileTransferResponse
+                        try:
+                            from ...shared.message_types import FileTransferResponse
+                        except ImportError:
+                            from shared.message_types import FileTransferResponse
                         response = FileTransferResponse(transfer_id, True)
                         self.client_core.send_message(response)
                     else:
