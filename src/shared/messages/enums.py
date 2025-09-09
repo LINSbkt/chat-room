@@ -1,0 +1,42 @@
+"""
+Message type enumerations.
+"""
+
+from enum import Enum
+
+
+class MessageType(Enum):
+    """Enumeration of message types."""
+    # Connection messages
+    CONNECT = "CONNECT"
+    DISCONNECT = "DISCONNECT"
+    
+    # Authentication messages
+    AUTH_REQUEST = "AUTH_REQUEST"
+    AUTH_RESPONSE = "AUTH_RESPONSE"
+    
+    # Messaging
+    PUBLIC_MESSAGE = "PUBLIC_MESSAGE"
+    PRIVATE_MESSAGE = "PRIVATE_MESSAGE"
+    
+    # User management
+    USER_LIST_REQUEST = "USER_LIST_REQUEST"
+    USER_LIST_RESPONSE = "USER_LIST_RESPONSE"
+    USER_JOINED = "USER_JOINED"
+    USER_LEFT = "USER_LEFT"
+    
+    # File transfer
+    FILE_TRANSFER_REQUEST = "FILE_TRANSFER_REQUEST"
+    FILE_TRANSFER_RESPONSE = "FILE_TRANSFER_RESPONSE"
+    FILE_CHUNK = "FILE_CHUNK"
+    FILE_TRANSFER_COMPLETE = "FILE_TRANSFER_COMPLETE"
+    
+    # System messages
+    SYSTEM_MESSAGE = "SYSTEM_MESSAGE"
+    ERROR_MESSAGE = "ERROR_MESSAGE"
+    
+    # Encryption messages
+    KEY_EXCHANGE_REQUEST = "KEY_EXCHANGE_REQUEST"
+    KEY_EXCHANGE_RESPONSE = "KEY_EXCHANGE_RESPONSE"
+    AES_KEY_EXCHANGE = "AES_KEY_EXCHANGE"
+    ENCRYPTED_MESSAGE = "ENCRYPTED_MESSAGE"
