@@ -25,6 +25,11 @@ class FileHandler:
     def handle_file_transfer_request(self, message: FileTransferRequest):
         """Handle incoming file transfer request."""
         try:
+            # Don't process file transfer requests from ourselves (sender shouldn't receive their own request)
+            if message.sender == self.client_core.username:
+                self.logger.debug(f"📩 Ignoring file transfer request from self: {message.filename}")
+                return
+                
             self.logger.info(f"📩 Received file transfer request: {message.filename} from {message.sender}")
             
             transfer_id = message.transfer_id or message.message_id
