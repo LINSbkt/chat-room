@@ -168,12 +168,43 @@ class MessageRouter:
                 
                 self.logger.info(f"🔐 ROUTER: Decrypted message: '{decrypted_content}'")
                 
-                # Route the decrypted message normally through client handler
+                # Route the decrypted message through the proper handler structure
                 if message.is_private:
                     self.logger.info(f"🔐 ROUTER: Routing decrypted private message to recipient: {message.recipient}")
-                    client_handler.handle_private_message(decrypted_message)
+                    # Create a PRIVATE_MESSAGE message and route it through the handler
+                    try:
+                        from ..shared.message_types import Message, MessageType
+                    except ImportError:
+                        import sys
+                        import os
+                        sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+                        from shared.message_types import Message, MessageType
+                    
+                    private_msg = Message(MessageType.PRIVATE_MESSAGE, {
+                        'content': decrypted_content,
+                        'recipient': message.recipient
+                    })
+                    # Call chat handler directly to avoid recursion
+                    from .handlers.server_chat_handler import ServerChatHandler
+                    chat_handler = ServerChatHandler(client_handler)
+                    chat_handler.handle_private_message(private_msg)
                 else:
                     self.logger.info(f"🔐 ROUTER: Routing decrypted public message for broadcast")
-                    client_handler.handle_public_message(decrypted_message)
+                    # Create a PUBLIC_MESSAGE message and route it through the handler  
+                    try:
+                        from ..shared.message_types import Message, MessageType
+                    except ImportError:
+                        import sys
+                        import os
+                        sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+                        from shared.message_types import Message, MessageType
+                    
+                    public_msg = Message(MessageType.PUBLIC_MESSAGE, {
+                        'content': decrypted_content
+                    })
+                    # Call chat handler directly to avoid recursion
+                    from .handlers.server_chat_handler import ServerChatHandler
+                    chat_handler = ServerChatHandler(client_handler)
+                    chat_handler.handle_public_message(public_msg)
         except Exception as e:
             self.logger.error(f"Error handling encrypted message: {e}")

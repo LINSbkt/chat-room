@@ -16,13 +16,15 @@ from PySide6.QtCore import Qt, Slot, QUrl
 from PySide6.QtGui import QFont, QColor, QDesktopServices
 try:
     from ..chat_client import ChatClient
-    from ..shared.message_types import MessageType, ChatMessage
+    from ...shared.messages.enums import MessageType
+    from ...shared.messages.chat import ChatMessage
 except ImportError:
     import sys
     import os
     sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
     from client.chat_client import ChatClient
-    from shared.message_types import MessageType, ChatMessage
+    from shared.messages.enums import MessageType
+    from shared.messages.chat import ChatMessage
 
 
 class MainWindow(QMainWindow):
@@ -415,11 +417,9 @@ class MainWindow(QMainWindow):
     @Slot(object)
     def on_file_transfer_request(self, request):
         """Handle incoming file transfer request."""
-        print(f"DEBUG: GUI received file transfer request signal!")
-        filename = request.data.get('filename', 'Unknown file')
-        sender = request.sender or 'Unknown user'  # Get sender from message attribute, not data
-        file_size = request.data.get('file_size', 0)
-        print(f"DEBUG: File transfer request - filename: {filename}, sender: {sender}, size: {file_size}")
+        filename = request.filename  # Use property, not data dict
+        sender = request.sender or 'Unknown user'
+        file_size = request.file_size  # Use property, not data dict
         
         # Format file size
         if file_size > 1024 * 1024:
@@ -442,12 +442,12 @@ class MainWindow(QMainWindow):
         
         if reply == QMessageBox.StandardButton.Yes:
             # Accept the file transfer
-            transfer_id = request.data.get('transfer_id') or request.message_id
+            transfer_id = request.transfer_id or request.message_id  # Use property
             self.chat_client.accept_file_transfer(transfer_id)
             self.display_system_message(f"📥 Accepting file '{filename}' from {sender}")
         else:
             # Decline the file transfer
-            transfer_id = request.data.get('transfer_id') or request.message_id
+            transfer_id = request.transfer_id or request.message_id  # Use property
             self.chat_client.decline_file_transfer(transfer_id)
             self.display_system_message(f"❌ Declined file '{filename}' from {sender}")
     
