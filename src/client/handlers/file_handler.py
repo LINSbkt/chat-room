@@ -50,13 +50,13 @@ class FileHandler:
                         self.client_core.signals.file_transfer_request.emit(message)
                 else:
                     self.logger.error(f"Failed to set up incoming transfer {transfer_id}")
-                    self.client_core.signals.error_occurred.emit("Failed to prepare for file transfer")
+                    self.client_core.signals.system_message.emit("Failed to prepare for file transfer")
             else:
                 self.logger.error("File transfer request missing transfer_id")
-                self.client_core.signals.error_occurred.emit("Invalid file transfer request")
+                self.client_core.signals.system_message.emit("Invalid file transfer request")
         except Exception as e:
             self.logger.error(f"Error handling file transfer request: {e}")
-            self.client_core.signals.error_occurred.emit(f"Error handling file transfer request: {e}")
+            self.client_core.signals.system_message.emit(f"Error handling file transfer request: {e}")
     
     def handle_file_transfer_response(self, message: FileTransferResponse):
         """Handle file transfer response (accept/decline)."""
