@@ -51,14 +51,17 @@ class ServerFileHandler:
                                  if client.username and client.username != self.client_connection.username]
                     if not other_users:
                         self.logger.info("📤 No other users online to receive file transfer")
-                        # Don't send error message if no other users are online
+                        # Send info message instead of error
+                        self._send_error_message("No other users online to receive the file")
                     else:
-                        self._send_error_message("Failed to broadcast file transfer request")
+                        self.logger.warning("📤 Failed to broadcast file transfer request to some users")
+                        # Send info message instead of error to avoid disconnection
+                        self._send_error_message("File transfer request sent, but some users may not receive it")
             else:
                 # Handle private file transfers
                 recipient_handler = self.client_connection.server.get_client_by_username(message.recipient)
                 if not recipient_handler:
-                    self._send_error_message(f"User {message.recipient} not found")
+                    self._send_error_message(f"User {message.recipient} is not online")
                     return
                 
                 # Forward the request to the recipient
@@ -74,7 +77,7 @@ class ServerFileHandler:
                     else:
                         self.logger.info(f"📤 Forwarded file transfer request to {message.recipient}")
                 else:
-                    self._send_error_message("Failed to send file transfer request")
+                    self._send_error_message("Failed to send file transfer request to recipient")
                 
         except Exception as e:
             self.logger.error(f"Error handling file transfer request: {e}")
@@ -116,7 +119,7 @@ class ServerFileHandler:
             # Forward the chunk to the recipient
             success = self.client_connection.server.forward_file_chunk(message, self.client_connection.username)
             if not success:
-                self._send_error_message("Failed to forward file chunk")
+                self.logger.warning("Failed to forward file chunk - transfer may have completed")
                 
         except Exception as e:
             self.logger.error(f"Error handling file chunk: {e}")
@@ -137,7 +140,7 @@ class ServerFileHandler:
                 message, self.client_connection.username)
             
             if not success:
-                self.logger.warning(f"Could not forward file transfer completion for transfer {message.transfer_id}")
+                self.logger.warning(f"Could not forward file transfer completion for transfer {message.transfer_id} - transfer may have already completed")
             
             # FileTransferServerManager handles cleanup automatically
                 
@@ -147,5 +150,6 @@ class ServerFileHandler:
     
     def _send_error_message(self, content: str):
         """Send an error message to the client."""
-        system_message = SystemMessage(content, "error")
+        # For file transfer errors, send as info instead of error to avoid disconnection
+        system_message = SystemMessage(content, "info")
         self.client_connection.send_message(system_message)
