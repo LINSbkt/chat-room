@@ -6,6 +6,9 @@ import logging
 try:
     from ...shared.message_types import MessageType, KeyExchangeMessage
 except ImportError:
+    import sys
+    import os
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
     from shared.message_types import MessageType, KeyExchangeMessage
 
 

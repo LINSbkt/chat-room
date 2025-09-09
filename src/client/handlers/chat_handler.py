@@ -7,6 +7,9 @@ try:
     from ...shared.message_types import (MessageType, ChatMessage, EncryptedMessage, 
                                        AESKeyMessage)
 except ImportError:
+    import sys
+    import os
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
     from shared.message_types import (MessageType, ChatMessage, EncryptedMessage, 
                                     AESKeyMessage)
 
