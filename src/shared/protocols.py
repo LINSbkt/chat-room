@@ -40,7 +40,8 @@ class Protocol:
             if message_type_str:
                 from .message_types import (MessageType, ChatMessage, SystemMessage, UserListMessage, 
                                           KeyExchangeMessage, AESKeyMessage, EncryptedMessage,
-                                          FileTransferRequest, FileTransferResponse, FileChunk, FileTransferComplete)
+                                          FileTransferRequest, FileTransferResponse, FileChunk, FileTransferComplete,
+                                          FileListRequest, FileListResponse)
                 
                 message_type = MessageType(message_type_str)
                 
@@ -65,6 +66,10 @@ class Protocol:
                     return FileChunk.from_dict(message_dict)
                 elif message_type == MessageType.FILE_TRANSFER_COMPLETE:
                     return FileTransferComplete.from_dict(message_dict)
+                elif message_type == MessageType.FILE_LIST_REQUEST:
+                    return FileListRequest.from_dict(message_dict)
+                elif message_type == MessageType.FILE_LIST_RESPONSE:
+                    return FileListResponse.from_dict(message_dict)
                 elif message_type == MessageType.AUTH_RESPONSE:
                     # AUTH_RESPONSE is a generic Message type
                     return Message.from_dict(message_dict)
