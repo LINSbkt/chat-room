@@ -115,13 +115,13 @@ class MainWindow(QMainWindow):
         self.file_transfer_list.itemDoubleClicked.connect(self.on_file_transfer_item_clicked)
         user_layout.addWidget(self.file_transfer_list)
         
-        # Downloads area
-        downloads_layout = QHBoxLayout()
-        downloads_layout.addWidget(QLabel("Downloads:"))
+        # Files area
+        files_layout = QHBoxLayout()
+        files_layout.addWidget(QLabel("Available Files:"))
         self.open_downloads_button = QPushButton("📂 Open Folder")
         self.open_downloads_button.clicked.connect(self.open_downloads_folder)
-        downloads_layout.addWidget(self.open_downloads_button)
-        user_layout.addLayout(downloads_layout)
+        files_layout.addWidget(self.open_downloads_button)
+        user_layout.addLayout(files_layout)
         
         self.downloads_list = QListWidget()
         self.downloads_list.setMaximumHeight(100)
@@ -163,6 +163,7 @@ class MainWindow(QMainWindow):
         chat_client.file_transfer_request.connect(self.on_file_transfer_request)
         chat_client.file_transfer_progress.connect(self.on_file_transfer_progress)
         chat_client.file_transfer_complete.connect(self.on_file_transfer_complete)
+        chat_client.file_list_received.connect(self.on_file_list_received)
         
         print("DEBUG: All signals connected")
         
@@ -498,6 +499,40 @@ class MainWindow(QMainWindow):
         else:
             self.display_system_message(f"❌ File transfer failed: {transfer_id}")
     
+    @Slot(list)
+    def on_file_list_received(self, file_list):
+        """Handle received file list from server."""
+        print(f"DEBUG: Received file list with {len(file_list)} files")
+        
+        # Clear existing downloads list
+        self.downloads_list.clear()
+        
+        # Add files to downloads list
+        for file_info in file_list:
+            filename = file_info.get('filename', 'Unknown')
+            file_path = file_info.get('file_path', '')
+            is_public = file_info.get('is_public', False)
+            
+            # Create display text with public/private indicator
+            if is_public:
+                display_text = f"🌐 {filename}"
+                tooltip = f"Public file\nPath: {file_path}"
+            else:
+                display_text = f"🔒 {filename}"
+                tooltip = f"Private file\nPath: {file_path}"
+            
+            # Create item and add to list
+            item = QListWidgetItem(display_text)
+            item.setData(Qt.ItemDataRole.UserRole, file_path)
+            item.setToolTip(tooltip)
+            self.downloads_list.addItem(item)
+        
+        # Show system message
+        if len(file_list) > 0:
+            self.display_system_message(f"📋 Loaded {len(file_list)} accessible files")
+        else:
+            self.display_system_message("📋 No accessible files found")
+    
     def display_system_message(self, message):
         """Display a system message in the chat."""
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -533,21 +568,21 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error Opening File", f"Could not open file:\n{str(e)}")
     
     def open_downloads_folder(self):
-        """Open the downloads folder in the system file manager."""
-        downloads_dir = os.path.join(os.getcwd(), "downloads")
+        """Open the storages folder in the system file manager."""
+        storages_dir = os.path.join(os.getcwd(), "storages")
         
-        # Create downloads directory if it doesn't exist
-        os.makedirs(downloads_dir, exist_ok=True)
+        # Create storages directory if it doesn't exist
+        os.makedirs(storages_dir, exist_ok=True)
         
         try:
             if platform.system() == 'Windows':
-                os.startfile(downloads_dir)
+                os.startfile(storages_dir)
             elif platform.system() == 'Darwin':  # macOS
-                subprocess.run(['open', downloads_dir])
+                subprocess.run(['open', storages_dir])
             else:  # Linux
-                subprocess.run(['xdg-open', downloads_dir])
+                subprocess.run(['xdg-open', storages_dir])
         except Exception as e:
-            QMessageBox.critical(self, "Error Opening Folder", f"Could not open downloads folder:\n{str(e)}")
+            QMessageBox.critical(self, "Error Opening Folder", f"Could not open storages folder:\n{str(e)}")
     
     def on_file_transfer_item_clicked(self, item):
         """Handle double-click on file transfer item."""
@@ -561,17 +596,11 @@ class MainWindow(QMainWindow):
             self.open_file(file_path)
     
     def load_existing_downloads(self):
-        """Load existing files from the downloads folder."""
-        downloads_dir = os.path.join(os.getcwd(), "downloads")
-        
-        if os.path.exists(downloads_dir):
-            try:
-                for filename in os.listdir(downloads_dir):
-                    file_path = os.path.join(downloads_dir, filename)
-                    if os.path.isfile(file_path):
-                        self.add_to_downloads_list(filename, file_path)
-            except Exception as e:
-                print(f"Error loading existing downloads: {e}")
+        """Load existing files from the storages folder."""
+        # This method is now replaced by on_file_list_received
+        # The file list will be loaded automatically when the client connects
+        # and receives the file list from the server
+        pass
     
     def closeEvent(self, event):
         """Handle window close event."""
