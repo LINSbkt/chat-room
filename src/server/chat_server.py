@@ -47,6 +47,17 @@ class ChatServer:
         self.crypto_manager = ServerCryptoManager()
         self.file_transfer_manager = FileTransferManager()
         
+        # Initialize file access controller
+        try:
+            from .file_access_controller import FileAccessController
+            self.file_access_controller = FileAccessController(self)
+        except ImportError:
+            self.file_access_controller = None
+            self.logger.warning("File access controller not available")
+        
+        # Initialize shared AES key
+        self.crypto_manager.setup_shared_aes_key()
+        
         # Setup logging
         self.logger = logging.getLogger(__name__)
     
