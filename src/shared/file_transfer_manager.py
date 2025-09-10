@@ -6,7 +6,7 @@ import os
 import hashlib
 import base64
 import uuid
-from typing import Dict, Optional, Tuple, BinaryIO
+from typing import Dict, Optional, Tuple, BinaryIO, List
 from datetime import datetime
 import logging
 
@@ -18,6 +18,14 @@ class FileTransferManager:
         self.chunk_size = chunk_size
         self.active_transfers: Dict[str, Dict] = {}
         self.logger = logging.getLogger(__name__)
+        
+        # Initialize file permission manager
+        try:
+            from .file_permission_manager import FilePermissionManager
+            self.permission_manager = FilePermissionManager()
+        except ImportError:
+            self.permission_manager = None
+            self.logger.warning("File permission manager not available")
     
     def generate_transfer_id(self) -> str:
         """Generate a unique transfer ID."""
@@ -110,24 +118,30 @@ class FileTransferManager:
     
     def start_incoming_transfer(self, transfer_id: str, filename: str, 
                               file_size: int, file_hash: str, 
-                              sender: str, recipient: str) -> bool:
+                              sender: str, recipient: str, is_public: bool = False) -> bool:
         """Start an incoming file transfer."""
         try:
-            # Create downloads directory if it doesn't exist
-            # Use a more predictable location - relative to the project root
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))  # Go up 3 levels from src/shared/
-            downloads_dir = os.path.join(project_root, "downloads")
-            os.makedirs(downloads_dir, exist_ok=True)
+            # Use permission manager to get proper storage path
+            if not self.permission_manager:
+                raise RuntimeError("File permission manager is required but not available")
             
-            self.logger.info(f"📁 Downloads directory: {downloads_dir}")
+            # Determine if this is a public or private file
+            is_public_file = is_public or recipient == "GLOBAL"
+            output_path = self.permission_manager.get_storage_path(
+                filename, sender, recipient, is_public_file
+            )
             
             # Generate unique filename to avoid conflicts
             base_name, ext = os.path.splitext(filename)
             counter = 1
-            output_path = os.path.join(downloads_dir, filename)
             while os.path.exists(output_path):
-                output_path = os.path.join(downloads_dir, f"{base_name}_{counter}{ext}")
+                new_filename = f"{base_name}_{counter}{ext}"
+                output_path = self.permission_manager.get_storage_path(
+                    new_filename, sender, recipient, is_public_file
+                )
                 counter += 1
+            
+            self.logger.info(f"📁 Storage path: {output_path}")
             
             self.active_transfers[transfer_id] = {
                 'type': 'incoming',
@@ -140,6 +154,7 @@ class FileTransferManager:
                 'received_chunks': 0,
                 'sender': sender,
                 'recipient': recipient,
+                'is_public': is_public or recipient == "GLOBAL",
                 'start_time': datetime.now(),
                 'status': 'receiving'
             }
@@ -262,3 +277,15 @@ class FileTransferManager:
     def get_all_transfers(self) -> Dict[str, Dict]:
         """Get all active transfers."""
         return {tid: self.get_transfer_status(tid) for tid in self.active_transfers.keys()}
+    
+    def can_user_access_file(self, user: str, file_path: str) -> bool:
+        """Check if user can access a file."""
+        if not self.permission_manager:
+            raise RuntimeError("File permission manager is required but not available")
+        return self.permission_manager.can_user_access_file(user, file_path)
+    
+    def get_user_accessible_files(self, user: str) -> List[str]:
+        """Get list of files user can access."""
+        if not self.permission_manager:
+            raise RuntimeError("File permission manager is required but not available")
+        return self.permission_manager.get_user_accessible_files(user)

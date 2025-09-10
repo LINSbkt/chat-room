@@ -91,9 +91,9 @@ class MessageRouter:
                 )
                 self.logger.info(f"Stored public key for client: {client_handler.username}")
                 
-                # Automatically generate and send AES key
+                # Automatically generate and send shared AES key
                 try:
-                    encrypted_aes_key = self.server.crypto_manager.generate_and_encrypt_aes_key(
+                    encrypted_aes_key = self.server.crypto_manager.encrypt_shared_aes_key_for_client(
                         client_handler.username
                     )
                     
@@ -124,8 +124,8 @@ class MessageRouter:
             except ImportError:
                 from shared.message_types import AESKeyMessage
             if isinstance(message, AESKeyMessage):
-                # Generate and send AES key to client
-                encrypted_aes_key = self.server.crypto_manager.generate_and_encrypt_aes_key(
+                # Generate and send shared AES key to client
+                encrypted_aes_key = self.server.crypto_manager.encrypt_shared_aes_key_for_client(
                     client_handler.username
                 )
                 
@@ -141,70 +141,36 @@ class MessageRouter:
             self.logger.error(f"Error handling AES key exchange: {e}")
     
     def handle_encrypted_message(self, message: Message, client_handler):
-        """Handle encrypted message."""
+        """Handle encrypted message - route without decryption."""
         try:
             try:
-                from ..shared.message_types import EncryptedMessage, ChatMessage
+                from ..shared.message_types import EncryptedMessage
             except ImportError:
-                from shared.message_types import EncryptedMessage, ChatMessage
+                from shared.message_types import EncryptedMessage
             if isinstance(message, EncryptedMessage):
                 self.logger.info(f"🔐 ROUTER: Processing encrypted message from {client_handler.username}")
-                self.logger.info(f"🔐 ROUTER: Encrypted content: {message.encrypted_content}")
-                self.logger.info(f"🔐 ROUTER: Message type: {'Private' if message.is_private else 'Public'}")
+                self.logger.info(f"🔐 SERVER SIDE: Received encrypted message: '{message.encrypted_content}'")
+                self.logger.info(f"🔐 SERVER SIDE: Message type: {'Private' if message.is_private else 'Public'}")
+                self.logger.info(f"🔐 SERVER SIDE: Routing encrypted message WITHOUT decryption")
                 
-                # Decrypt the message
-                decrypted_content = self.server.crypto_manager.decrypt_message_from_client(
-                    message.encrypted_content, 
-                    client_handler.username
-                )
-                
-                # Create a regular message with decrypted content
-                decrypted_message = ChatMessage(
-                    decrypted_content,
-                    client_handler.username,
-                    message.recipient,
-                    message.is_private
-                )
-                
-                self.logger.info(f"🔐 ROUTER: Decrypted message: '{decrypted_content}'")
-                
-                # Route the decrypted message through the proper handler structure
+                # Route the encrypted message directly without decryption
                 if message.is_private:
-                    self.logger.info(f"🔐 ROUTER: Routing decrypted private message to recipient: {message.recipient}")
-                    # Create a PRIVATE_MESSAGE message and route it through the handler
-                    try:
-                        from ..shared.message_types import Message, MessageType
-                    except ImportError:
-                        import sys
-                        import os
-                        sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-                        from shared.message_types import Message, MessageType
+                    self.logger.info(f"🔐 ROUTER: Routing encrypted private message to recipient: {message.recipient}")
+                    # Find recipient and send encrypted message directly
+                    recipient_client = self.server.get_client_by_username(message.recipient)
+                    if not recipient_client:
+                        self.logger.error(f"Recipient {message.recipient} not found")
+                        return
                     
-                    private_msg = Message(MessageType.PRIVATE_MESSAGE, {
-                        'content': decrypted_content,
-                        'recipient': message.recipient
-                    })
-                    # Call chat handler directly to avoid recursion
-                    from .handlers.server_chat_handler import ServerChatHandler
-                    chat_handler = ServerChatHandler(client_handler)
-                    chat_handler.handle_private_message(private_msg)
+                    # Send encrypted message directly to recipient
+                    recipient_client.send_message(message)
+                    self.logger.info(f"🔐 SERVER SIDE: Forwarded encrypted private message to {message.recipient}")
+                    self.logger.info(f"🔐 SERVER SIDE: Forwarded encrypted content: '{message.encrypted_content}'")
                 else:
-                    self.logger.info(f"🔐 ROUTER: Routing decrypted public message for broadcast")
-                    # Create a PUBLIC_MESSAGE message and route it through the handler  
-                    try:
-                        from ..shared.message_types import Message, MessageType
-                    except ImportError:
-                        import sys
-                        import os
-                        sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-                        from shared.message_types import Message, MessageType
-                    
-                    public_msg = Message(MessageType.PUBLIC_MESSAGE, {
-                        'content': decrypted_content
-                    })
-                    # Call chat handler directly to avoid recursion
-                    from .handlers.server_chat_handler import ServerChatHandler
-                    chat_handler = ServerChatHandler(client_handler)
-                    chat_handler.handle_public_message(public_msg)
+                    self.logger.info(f"🔐 ROUTER: Broadcasting encrypted public message")
+                    # Broadcast encrypted message to all clients except sender
+                    self.server.broadcast_message(message, exclude_client_id=client_handler.client_id)
+                    self.logger.info(f"🔐 SERVER SIDE: Broadcasted encrypted public message")
+                    self.logger.info(f"🔐 SERVER SIDE: Broadcasted encrypted content: '{message.encrypted_content}'")
         except Exception as e:
             self.logger.error(f"Error handling encrypted message: {e}")

@@ -64,8 +64,10 @@ class ChatHandler:
         if isinstance(message, EncryptedMessage):
             try:
                 self.logger.info(f"📥 CLIENT RECEIVE: Received encrypted message from {message.sender}")
+                self.logger.info(f"🔐 RECEIVER SIDE: Received encrypted message: '{message.encrypted_content}'")
                 
                 decrypted_content = self.client_core.crypto_manager.decrypt_message(message.encrypted_content)
+                self.logger.info(f"🔐 RECEIVER SIDE: Decrypted message: '{decrypted_content}'")
                 self.logger.info(f"📥 CLIENT RECEIVE: Successfully decrypted message: '{decrypted_content}'")
                 
                 # Create a regular message with decrypted content
@@ -92,6 +94,8 @@ class ChatHandler:
             if self.client_core.crypto_manager.is_ready_for_encryption():
                 self.logger.info(f"📤 CLIENT SEND: Encryption enabled, encrypting message")
                 encrypted_content = self.client_core.crypto_manager.encrypt_message(content)
+                self.logger.info(f"🔐 SENDER SIDE: Original message: '{content}'")
+                self.logger.info(f"🔐 SENDER SIDE: Encrypted message: '{encrypted_content}'")
                 message = EncryptedMessage(encrypted_content, self.client_core.username, is_private=False)
                 self.logger.info(f"📤 CLIENT SEND: Sending encrypted public message")
             else:
@@ -120,6 +124,8 @@ class ChatHandler:
             if self.client_core.crypto_manager.is_ready_for_encryption():
                 self.logger.info(f"📤 CLIENT SEND: Encryption enabled, encrypting private message")
                 encrypted_content = self.client_core.crypto_manager.encrypt_message(content)
+                self.logger.info(f"🔐 SENDER SIDE: Original private message: '{content}'")
+                self.logger.info(f"🔐 SENDER SIDE: Encrypted private message: '{encrypted_content}'")
                 message = EncryptedMessage(encrypted_content, self.client_core.username, recipient, is_private=True)
                 self.logger.info(f"📤 CLIENT SEND: Sending encrypted private message to '{recipient}'")
             else:

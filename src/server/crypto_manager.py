@@ -3,6 +3,7 @@ Server-side cryptographic manager for handling client encryption.
 """
 
 import logging
+import os
 from typing import Dict, Optional
 from cryptography.hazmat.primitives.asymmetric import rsa
 try:
@@ -22,7 +23,8 @@ class ServerCryptoManager(CryptoManager):
     def __init__(self):
         super().__init__()
         self.client_public_keys: Dict[str, rsa.RSAPublicKey] = {}
-        self.client_aes_keys: Dict[str, bytes] = {}
+        self.shared_aes_key: Optional[bytes] = None
+        self.shared_aes_iv: Optional[bytes] = None
         self.logger = logging.getLogger(__name__)
     
     def add_client_public_key(self, username: str, public_key_pem: str):
@@ -38,104 +40,77 @@ class ServerCryptoManager(CryptoManager):
     def remove_client_keys(self, username: str):
         """Remove a client's keys."""
         self.client_public_keys.pop(username, None)
-        self.client_aes_keys.pop(username, None)
         self.logger.info(f"Removed keys for client: {username}")
     
-    def generate_and_encrypt_aes_key(self, username: str) -> str:
-        """Generate AES key and encrypt it with client's public key."""
+    def generate_shared_aes_key(self) -> bytes:
+        """Generate a shared AES key for all clients."""
+        try:
+            # Generate new shared AES key if not already exists
+            if not self.shared_aes_key:
+                self.shared_aes_key = os.urandom(32)  # 256-bit key
+                self.shared_aes_iv = os.urandom(16)   # 128-bit IV
+                self.logger.info("Generated new shared AES key for all clients")
+            
+            return self.shared_aes_key
+        except Exception as e:
+            self.logger.error(f"Failed to generate shared AES key: {e}")
+            raise
+    
+    def encrypt_shared_aes_key_for_client(self, username: str) -> str:
+        """Encrypt the shared AES key with client's public key."""
         if username not in self.client_public_keys:
             raise ValueError(f"No public key found for client: {username}")
         
         try:
-            # Generate new AES key
-            aes_key = self.generate_aes_key()
+            # Ensure shared key exists
+            if not self.shared_aes_key:
+                self.generate_shared_aes_key()
             
-            # Store the AES key for this client
-            self.client_aes_keys[username] = aes_key
-            
-            # Encrypt AES key with client's public key
+            # Encrypt shared AES key with client's public key
             client_public_key = self.client_public_keys[username]
+            # The base class encrypt_aes_key_with_rsa uses self.aes_key and self.aes_iv
+            # which are set by generate_shared_aes_key
             encrypted_aes_key = self.encrypt_aes_key_with_rsa(client_public_key)
             
-            self.logger.info(f"Generated and encrypted AES key for client: {username}")
+            self.logger.info(f"Encrypted shared AES key for client: {username}")
             return encrypted_aes_key
         except Exception as e:
-            self.logger.error(f"Failed to generate AES key for {username}: {e}")
+            self.logger.error(f"Failed to encrypt shared AES key for {username}: {e}")
             raise
     
-    def get_client_aes_key(self, username: str) -> Optional[bytes]:
-        """Get the AES key for a specific client."""
-        return self.client_aes_keys.get(username)
+    def get_shared_aes_key(self) -> bytes:
+        """Get the shared AES key."""
+        if not self.shared_aes_key:
+            self.generate_shared_aes_key()
+        return self.shared_aes_key
     
-    def encrypt_message_for_client(self, message: str, username: str) -> str:
-        """Encrypt a message for a specific client."""
-        if username not in self.client_aes_keys:
-            raise ValueError(f"No AES key found for client: {username}")
-        
+    def setup_shared_aes_key(self):
+        """Setup the shared AES key in the base class."""
         try:
-            self.logger.info(f"🔐 SERVER ENCRYPTION: Starting encryption for client '{username}'")
-            self.logger.info(f"🔐 SERVER ENCRYPTION: Original message: '{message}'")
+            # Generate shared key if not exists
+            if not self.shared_aes_key:
+                self.generate_shared_aes_key()
             
-            # Temporarily set the client's AES key
-            original_aes_key = self.aes_key
-            original_aes_iv = self.aes_iv
+            # Set the shared key in the base class
+            self.aes_key = self.shared_aes_key
+            self.aes_iv = self.shared_aes_iv
             
-            self.aes_key = self.client_aes_keys[username]
-            self.aes_iv = None  # Will generate new IV for each message
-            
-            # Encrypt the message
-            encrypted_message = self.encrypt_with_aes(message)
-            
-            # Restore original AES key
-            self.aes_key = original_aes_key
-            self.aes_iv = original_aes_iv
-            
-            self.logger.info(f"🔐 SERVER ENCRYPTION: Message encrypted for client '{username}'")
-            return encrypted_message
+            self.logger.info("Server shared AES key setup completed")
         except Exception as e:
-            self.logger.error(f"Failed to encrypt message for {username}: {e}")
+            self.logger.error(f"Failed to setup shared AES key: {e}")
             raise
     
-    def decrypt_message_from_client(self, encrypted_message: str, username: str) -> str:
-        """Decrypt a message from a specific client."""
-        if username not in self.client_aes_keys:
-            raise ValueError(f"No AES key found for client: {username}")
-        
-        try:
-            self.logger.info(f"🔓 SERVER DECRYPTION: Starting decryption from client '{username}'")
-            self.logger.info(f"🔓 SERVER DECRYPTION: Received encrypted data: {encrypted_message}")
-            
-            # Temporarily set the client's AES key
-            original_aes_key = self.aes_key
-            original_aes_iv = self.aes_iv
-            
-            self.aes_key = self.client_aes_keys[username]
-            self.aes_iv = None  # IV is included in the encrypted data
-            
-            # Decrypt the message
-            decrypted_message = self.decrypt_with_aes(encrypted_message)
-            
-            # Restore original AES key
-            self.aes_key = original_aes_key
-            self.aes_iv = original_aes_iv
-            
-            self.logger.info(f"🔓 SERVER DECRYPTION: Message decrypted from client '{username}': '{decrypted_message}'")
-            return decrypted_message
-        except Exception as e:
-            self.logger.error(f"Failed to decrypt message from {username}: {e}")
-            raise
-    
-    def has_client_keys(self, username: str) -> bool:
-        """Check if we have keys for a specific client."""
-        return (username in self.client_public_keys and 
-                username in self.client_aes_keys)
+    def has_client_public_key(self, username: str) -> bool:
+        """Check if client has a public key."""
+        return username in self.client_public_keys
     
     def get_all_clients(self) -> list:
-        """Get list of all clients with keys."""
+        """Get list of all client usernames."""
         return list(self.client_public_keys.keys())
     
     def clear_all_client_keys(self):
         """Clear all client keys."""
         self.client_public_keys.clear()
-        self.client_aes_keys.clear()
-        self.logger.info("Cleared all client keys")
+        self.shared_aes_key = None
+        self.shared_aes_iv = None
+        self.logger.info("Cleared all client keys and reset shared AES key")
