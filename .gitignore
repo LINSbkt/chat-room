@@ -60,6 +60,9 @@ logs/
 # Downloads folder for file transfers
 downloads/
 
+# File storage directories
+storages/
+
 # Documentation files
 conversation.md
 
