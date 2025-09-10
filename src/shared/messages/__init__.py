@@ -7,7 +7,7 @@ from .base import Message
 from .auth import AuthRequest, AuthResponse
 from .chat import ChatMessage, SystemMessage, UserListMessage
 from .crypto import KeyExchangeMessage, AESKeyMessage, EncryptedMessage
-from .file_transfer import FileTransferRequest, FileTransferResponse, FileChunk, FileTransferComplete
+from .file_transfer import FileTransferRequest, FileTransferResponse, FileChunk, FileTransferComplete, FileListRequest, FileListResponse
 
 __all__ = [
     'MessageType',
@@ -23,5 +23,7 @@ __all__ = [
     'FileTransferRequest',
     'FileTransferResponse',
     'FileChunk',
-    'FileTransferComplete'
+    'FileTransferComplete',
+    'FileListRequest',
+    'FileListResponse'
 ]
