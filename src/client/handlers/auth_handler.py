@@ -31,6 +31,9 @@ class AuthHandler:
             
             # Send key exchange after successful authentication
             self._send_key_exchange()
+            
+            # Request file list after authentication
+            self._request_file_list()
         else:
             self.logger.info("Authentication failed - status not success")
             self.client_core.auth_success = False
@@ -47,3 +50,13 @@ class AuthHandler:
                 self.logger.info("Key exchange sent after authentication")
         except Exception as e:
             self.logger.error(f"Failed to send key exchange: {e}")
+    
+    def _request_file_list(self):
+        """Request file list after successful authentication."""
+        try:
+            # Import here to avoid circular imports
+            from .file_handler import FileHandler
+            file_handler = FileHandler(self.client_core)
+            file_handler.request_file_list()
+        except Exception as e:
+            self.logger.error(f"Failed to request file list: {e}")

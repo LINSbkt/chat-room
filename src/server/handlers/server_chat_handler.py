@@ -109,33 +109,6 @@ class ServerChatHandler:
         except Exception as e:
             self.logger.error(f"Error handling user list request: {e}")
     
-    def handle_encrypted_message(self, message: EncryptedMessage):
-        """Handle encrypted message - treat as either public or private based on is_private flag."""
-        if not self.client_connection.is_authenticated:
-            self._send_error_message("Not authenticated")
-            return
-        
-        try:
-            # The server doesn't decrypt - it just forwards encrypted messages
-            # Determine if it's public or private based on the message's is_private flag
-            if message.is_private and message.recipient:
-                # Handle as private encrypted message
-                recipient_client = self.client_connection.server.get_client_by_username(message.recipient)
-                if not recipient_client:
-                    self._send_error_message(f"User {message.recipient} not found")
-                    return
-                
-                # Forward encrypted message to recipient
-                recipient_client.send_message(message)
-                self.logger.info(f"Forwarded encrypted private message from {self.client_connection.username} to {message.recipient}")
-            else:
-                # Handle as public encrypted message - broadcast to all except sender
-                self.client_connection.server.broadcast_message(message, 
-                                                              exclude_client_id=self.client_connection.client_id)
-                self.logger.info(f"Broadcasted encrypted public message from {self.client_connection.username}")
-            
-        except Exception as e:
-            self.logger.error(f"Error handling encrypted message: {e}")
     
     def _send_error_message(self, content: str):
         """Send an error message to the client."""

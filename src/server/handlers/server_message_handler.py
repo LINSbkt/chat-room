@@ -58,6 +58,8 @@ class ServerMessageHandler:
                 self.file_handler.handle_file_chunk(message)
             elif message.message_type == MessageType.FILE_TRANSFER_COMPLETE:
                 self.file_handler.handle_file_transfer_complete(message)
+            elif message.message_type == MessageType.FILE_LIST_REQUEST:
+                self.file_handler.handle_file_list_request(message)
             elif message.message_type == MessageType.DISCONNECT:
                 self.auth_handler.handle_disconnect(message)
             else:

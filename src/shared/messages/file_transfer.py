@@ -240,3 +240,68 @@ class FileTransferComplete(Message):
             message.timestamp = timestamp
         
         return message
+
+
+class FileListRequest(Message):
+    """Message class for requesting available files."""
+    
+    def __init__(self, sender: str):
+        data = {}
+        
+        super().__init__(
+            message_type=MessageType.FILE_LIST_REQUEST,
+            data=data,
+            sender=sender
+        )
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'FileListRequest':
+        """Create FileListRequest from dictionary."""
+        timestamp = data.get('timestamp')
+        if isinstance(timestamp, str):
+            timestamp = datetime.fromisoformat(timestamp)
+        
+        message = cls(sender=data['sender'])
+        
+        if timestamp:
+            message.timestamp = timestamp
+        
+        return message
+
+
+class FileListResponse(Message):
+    """Message class for file list responses."""
+    
+    def __init__(self, files: list, sender: str = None, recipient: str = None):
+        data = {
+            'files': files
+        }
+        
+        super().__init__(
+            message_type=MessageType.FILE_LIST_RESPONSE,
+            data=data,
+            sender=sender,
+            recipient=recipient
+        )
+    
+    @property
+    def files(self) -> list:
+        return self.data['files']
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'FileListResponse':
+        """Create FileListResponse from dictionary."""
+        timestamp = data.get('timestamp')
+        if isinstance(timestamp, str):
+            timestamp = datetime.fromisoformat(timestamp)
+        
+        message = cls(
+            files=data['data']['files'],
+            sender=data.get('sender'),
+            recipient=data.get('recipient')
+        )
+        
+        if timestamp:
+            message.timestamp = timestamp
+        
+        return message

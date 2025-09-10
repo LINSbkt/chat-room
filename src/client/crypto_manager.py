@@ -50,20 +50,20 @@ class ClientCryptoManager(CryptoManager):
             raise
     
     def setup_aes_encryption(self, encrypted_aes_key: str):
-        """Setup AES encryption using the encrypted key from server."""
+        """Setup AES encryption using the shared encrypted key from server."""
         try:
-            # Decrypt the AES key using our private key
+            # Decrypt the shared AES key using our private key
             aes_key, aes_iv = self.decrypt_aes_key_with_rsa(encrypted_aes_key)
             
-            # Set the AES key
+            # Set the shared AES key
             self.set_aes_key(aes_key, aes_iv)
             
             # Enable encryption
             self.is_encryption_enabled = True
             
-            self.logger.info("AES encryption setup completed")
+            self.logger.info("Shared AES encryption setup completed")
         except Exception as e:
-            self.logger.error(f"Failed to setup AES encryption: {e}")
+            self.logger.error(f"Failed to setup shared AES encryption: {e}")
             raise
     
     def encrypt_message(self, message: str) -> str:

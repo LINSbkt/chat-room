@@ -57,6 +57,8 @@ class MessageHandler:
                 self.file_handler.handle_file_chunk(message)
             elif message.message_type == MessageType.FILE_TRANSFER_COMPLETE:
                 self.file_handler.handle_file_transfer_complete(message)
+            elif message.message_type == MessageType.FILE_LIST_RESPONSE:
+                self.file_handler.handle_file_list_response(message)
             else:
                 self.logger.warning(f"Unknown message type: {message.message_type}")
                 

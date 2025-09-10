@@ -6,13 +6,15 @@ import logging
 import math
 try:
     from ...shared.message_types import (FileTransferRequest, FileTransferResponse, 
-                                       FileChunk, FileTransferComplete)
+                                       FileChunk, FileTransferComplete, FileListRequest, 
+                                       FileListResponse)
 except ImportError:
     import sys
     import os
     sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
     from shared.message_types import (FileTransferRequest, FileTransferResponse, 
-                                    FileChunk, FileTransferComplete)
+                                    FileChunk, FileTransferComplete, FileListRequest,
+                                    FileListResponse)
 
 
 class FileHandler:
@@ -36,7 +38,8 @@ class FileHandler:
             if transfer_id:
                 success = self.client_core.file_transfer_manager.start_incoming_transfer(
                     transfer_id, message.filename, message.file_size, 
-                    message.file_hash, message.sender, self.client_core.username
+                    message.file_hash, message.sender, self.client_core.username,
+                    is_public=not message.is_private
                 )
                 # Store whether this was a GLOBAL transfer for later reference
                 if success and transfer_id in self.client_core.file_transfer_manager.active_transfers:
@@ -270,3 +273,33 @@ class FileHandler:
             self.logger.error(f"Error completing file transfer: {e}")
             # Don't emit file_transfer_complete signal for sender - this is only for recipients
             # The recipient will receive the FileTransferComplete message and handle the GUI notification
+    
+    def handle_file_list_response(self, message: FileListResponse):
+        """Handle file list response."""
+        try:
+            self.logger.info(f"📋 Received file list: {len(message.files)} files")
+            
+            # Emit signal with file list for UI to display
+            self.client_core.signals.file_list_received.emit(message.files)
+            
+        except Exception as e:
+            self.logger.error(f"Error handling file list response: {e}")
+    
+    def request_file_list(self) -> bool:
+        """Request list of available files from server."""
+        if not self.client_core.connected or not self.client_core.username:
+            return False
+        
+        try:
+            request = FileListRequest(self.client_core.username)
+            success = self.client_core.send_message(request)
+            
+            if success:
+                self.logger.info("📋 File list request sent")
+            else:
+                self.logger.error("📋 Failed to send file list request")
+            
+            return success
+        except Exception as e:
+            self.logger.error(f"Error requesting file list: {e}")
+            return False
