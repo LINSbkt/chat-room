@@ -5,13 +5,15 @@ Server file transfer handler.
 import logging
 try:
     from ...shared.message_types import (FileTransferRequest, FileTransferResponse, 
-                                       FileChunk, FileTransferComplete, SystemMessage)
+                                       FileChunk, FileTransferComplete, FileListRequest, 
+                                       FileListResponse, SystemMessage)
 except ImportError:
     import sys
     import os
     sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
     from shared.message_types import (FileTransferRequest, FileTransferResponse, 
-                                    FileChunk, FileTransferComplete, SystemMessage)
+                                    FileChunk, FileTransferComplete, FileListRequest,
+                                    FileListResponse, SystemMessage)
 
 
 class ServerFileHandler:
@@ -147,6 +149,36 @@ class ServerFileHandler:
         except Exception as e:
             self.logger.error(f"Error handling file transfer complete: {e}")
             self._send_error_message("Error processing file transfer completion")
+    
+    def handle_file_list_request(self, message: FileListRequest):
+        """Handle file list request."""
+        if not self.client_connection.is_authenticated:
+            self._send_error_message("Not authenticated")
+            return
+        
+        try:
+            self.logger.info(f"📋 File list request from {self.client_connection.username}")
+            
+            # Get accessible files for the user
+            if hasattr(self.client_connection.server, 'file_access_controller'):
+                file_list = self.client_connection.server.file_access_controller.get_file_list_for_user(
+                    self.client_connection.username
+                )
+                
+                # Send file list response
+                response = FileListResponse(file_list, "server", self.client_connection.username)
+                success = self.client_connection.send_message(response)
+                
+                if success:
+                    self.logger.info(f"📋 Sent file list to {self.client_connection.username}: {len(file_list)} files")
+                else:
+                    self.logger.error(f"📋 Failed to send file list to {self.client_connection.username}")
+            else:
+                self._send_error_message("File access controller not available")
+                
+        except Exception as e:
+            self.logger.error(f"Error handling file list request: {e}")
+            self._send_error_message("Error processing file list request")
     
     def _send_error_message(self, content: str):
         """Send an error message to the client."""
