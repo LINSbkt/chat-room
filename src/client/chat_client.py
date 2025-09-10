@@ -27,6 +27,7 @@ class ChatClient:
         self.file_transfer_request = self.core.signals.file_transfer_request
         self.file_transfer_progress = self.core.signals.file_transfer_progress
         self.file_transfer_complete = self.core.signals.file_transfer_complete
+        self.file_list_received = self.core.signals.file_list_received
     
     # Connection methods
     def connect(self, username: str) -> bool:

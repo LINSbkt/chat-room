@@ -16,3 +16,4 @@ class ClientSignals(QObject):
     file_transfer_request = pyqtSignal(object)  # FileTransferRequest object
     file_transfer_progress = pyqtSignal(str, int, int)  # transfer_id, current, total
     file_transfer_complete = pyqtSignal(str, bool, str)  # transfer_id, success, file_path
+    file_list_received = pyqtSignal(list)  # List of file info dictionaries
