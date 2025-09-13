@@ -8,14 +8,14 @@ import logging
 from PySide6.QtWidgets import QApplication, QMessageBox
 try:
     from .chat_client import ChatClient
-    from .gui.main_window import MainWindow
+    from .gui.refactored_main_window import RefactoredMainWindow as MainWindow
     from .gui.dialogs.login_dialog import LoginDialog
 except ImportError:
     import sys
     import os
     sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
     from client.chat_client import ChatClient
-    from client.gui.main_window import MainWindow
+    from client.gui.refactored_main_window import RefactoredMainWindow as MainWindow
     from client.gui.dialogs.login_dialog import LoginDialog
 
 
