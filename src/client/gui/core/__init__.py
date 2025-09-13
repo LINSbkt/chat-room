@@ -1,0 +1,1 @@
+# Core GUI infrastructure package
