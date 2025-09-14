@@ -218,7 +218,8 @@ class ChatContextManager(BaseComponent):
         
         # Update state if this is the current context
         if context_id == self._current_context_id:
-            self._update_state()
+            # Only update context list, not chat histories to prevent duplicate display
+            self.update_state(StateKeys.CHAT_CONTEXTS, self.get_context_list())
         
         logger.debug(f"Added message to context {context_id}")
         return True
@@ -337,12 +338,14 @@ class ChatContextManager(BaseComponent):
         
         # Determine which context this message belongs to
         message_type = message.get("message_type", "public")
+        is_private = message.get("is_private", False)
         sender = message.get("sender")
         current_user = self.get_state(StateKeys.CURRENT_USER)
         
-        logger.debug(f"ChatContextManager: Received {message_type} message from {sender} (current user: {current_user})")
+        logger.debug(f"ChatContextManager: Received {message_type} message from {sender} (current user: {current_user}, is_private: {is_private})")
         
-        if message_type == "public":
+        # Use both message_type and is_private to determine routing
+        if message_type == "public" and not is_private:
             # Public messages always go to common context
             context_id = "common"
             logger.debug(f"ChatContextManager: Routing public message from {sender} to common context")
@@ -377,10 +380,15 @@ class ChatContextManager(BaseComponent):
         
         # Route message to appropriate context based on message type
         message_type = message.get("message_type", "public")
+        is_private = message.get("is_private", False)
         
-        if message_type == "public":
+        logger.debug(f"ChatContextManager: Handling sent {message_type} message (is_private: {is_private})")
+        
+        # Use both message_type and is_private to determine routing
+        if message_type == "public" and not is_private:
             # Public messages always go to common context
             context_id = "common"
+            logger.debug(f"ChatContextManager: Routing sent public message to common context")
         else:
             # Private messages go to the private context with the recipient
             recipient = message.get("recipient")
@@ -389,15 +397,17 @@ class ChatContextManager(BaseComponent):
                 existing_context = self._find_private_context_with_user(recipient)
                 if existing_context:
                     context_id = existing_context.context_id
+                    logger.debug(f"ChatContextManager: Found existing private context for sent message: {context_id}")
                 else:
                     context_id = self.create_private_context(recipient)
+                    logger.debug(f"ChatContextManager: Created new private context for sent message: {context_id}")
             else:
                 logger.error("Cannot route private message: no recipient specified")
                 return
         
         if context_id:
             self.add_message_to_context(context_id, message)
-            logger.debug(f"Added sent message to context: {context_id}")
+            logger.debug(f"ChatContextManager: Added sent message to context: {context_id}")
     
     def on_state_change(self, change) -> None:
         """Handle state changes."""

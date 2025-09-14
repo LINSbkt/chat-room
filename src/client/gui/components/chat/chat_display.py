@@ -82,13 +82,14 @@ class ChatDisplay(BaseComponent):
         
         # Determine if message belongs to current context
         message_type = message.get("message_type", "public")
+        is_private = message.get("is_private", False)
         sender = message.get("sender")
         current_user = self.get_state(StateKeys.CURRENT_USER)
         
-        logger.debug(f"ChatDisplay: Received {message_type} message from {sender} in context {current_context}")
+        logger.debug(f"ChatDisplay: Received {message_type} message from {sender} in context {current_context} (is_private: {is_private})")
         
         # STRICT CONTEXT CHECKING: Only display messages that belong to current context
-        if message_type == "public":
+        if message_type == "public" and not is_private:
             # Public messages ONLY belong in common context
             if current_context == "common":
                 is_sent = (sender == current_user)
@@ -96,7 +97,7 @@ class ChatDisplay(BaseComponent):
                 self._display_message(message, is_sent=is_sent)
             else:
                 logger.debug(f"ChatDisplay: Ignoring public message from {sender} - not in common context (current: {current_context})")
-        elif message_type == "private":
+        elif message_type == "private" or is_private:
             # Private messages ONLY belong in their specific private context
             if current_context != "common":
                 # Check if this is a message to/from the other participant in current context
@@ -114,9 +115,48 @@ class ChatDisplay(BaseComponent):
     
     def _handle_message_sent(self, event: Event) -> None:
         """Handle sent message."""
-        # Don't display sent messages immediately - they will be displayed when received from server
-        # This prevents duplicate message display
-        pass
+        message = event.data.get("message")
+        if not message:
+            logger.debug("ChatDisplay: No message data in MESSAGE_SENT event")
+            return
+        
+        # Get current context
+        current_context = self.get_state(StateKeys.CURRENT_CHAT_CONTEXT)
+        if not current_context:
+            logger.debug("ChatDisplay: No current context for sent message")
+            return
+        
+        # Determine if this sent message belongs to current context
+        message_type = message.get("message_type", "public")
+        is_private = message.get("is_private", False)
+        sender = message.get("sender")
+        current_user = self.get_state(StateKeys.CURRENT_USER)
+        
+        logger.debug(f"ChatDisplay: Handling sent {message_type} message from {sender} in context {current_context}")
+        
+        # Check if this sent message belongs to current context
+        if message_type == "public" and not is_private:
+            # Public messages belong in common context
+            if current_context == "common":
+                logger.debug(f"ChatDisplay: Displaying sent public message from {sender} in common context")
+                self._display_message(message, is_sent=True)
+            else:
+                logger.debug(f"ChatDisplay: Ignoring sent public message - not in common context (current: {current_context})")
+        elif message_type == "private" or is_private:
+            # Private messages belong in their specific private context
+            if current_context != "common":
+                # Check if this is a message to the other participant in current context
+                other_participant = self._get_other_participant(current_context)
+                recipient = message.get("recipient")
+                if other_participant and recipient == other_participant:
+                    logger.debug(f"ChatDisplay: Displaying sent private message to {recipient} in private context")
+                    self._display_message(message, is_sent=True)
+                else:
+                    logger.debug(f"ChatDisplay: Ignoring sent private message - not for current private context (recipient: {recipient}, other_participant: {other_participant})")
+            else:
+                logger.debug(f"ChatDisplay: Ignoring sent private message - not in private context (current: {current_context})")
+        else:
+            logger.warning(f"ChatDisplay: Unknown sent message type: {message_type}")
     
     def _handle_context_switched(self, event: Event) -> None:
         """Handle context switching."""
@@ -181,6 +221,8 @@ class ChatDisplay(BaseComponent):
         
         # Auto-scroll to bottom
         self._scroll_to_bottom()
+        
+        logger.debug(f"ChatDisplay: Displayed message from {message.get('sender', 'Unknown')}: {message.get('content', '')[:50]}...")
     
     def _display_system_message(self, message_text: str) -> None:
         """Display a system message."""
@@ -220,9 +262,9 @@ class ChatDisplay(BaseComponent):
                 self._switch_to_context(new_context)
         
         elif change.key == StateKeys.CHAT_HISTORIES:
-            # Message history updated, refresh if needed
-            if self.current_context_id:
-                self._load_context_messages(self.current_context_id)
+            # Message history updated - don't reload all messages to prevent duplicates
+            # Messages are already displayed when received via _handle_message_received
+            logger.debug("ChatDisplay: Chat histories updated, but not reloading to prevent duplicates")
         
         elif change.key == StateKeys.CURRENT_USER:
             # User changed, clear display
