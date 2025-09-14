@@ -177,6 +177,11 @@ class ChatEvents:
     USER_LIST_UPDATED = "chat.user.list.updated"
     COMMON_CHAT_SELECTED = "chat.common.selected"
     
+    # File transfer events
+    FILE_TRANSFER_REQUESTED = "chat.file.transfer.requested"
+    FILE_TRANSFER_PROGRESS = "chat.file.transfer.progress"
+    FILE_TRANSFER_COMPLETE = "chat.file.transfer.complete"
+    
     # System events
     CONNECTION_STATUS_CHANGED = "system.connection.changed"
     ERROR_OCCURRED = "system.error.occurred"
