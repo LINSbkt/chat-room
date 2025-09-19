@@ -13,6 +13,8 @@ try:
     from .managers.client_manager import ClientManager
     from .managers.broadcast_manager import BroadcastManager
     from .managers.file_transfer_server_manager import FileTransferServerManager
+    from .storage.message_storage import MessageStorage
+    from .storage.file_history_storage import FileHistoryStorage
     from ..shared.file_transfer_manager import FileTransferManager
 except ImportError:
     import sys
@@ -26,6 +28,8 @@ except ImportError:
     from server.managers.client_manager import ClientManager
     from server.managers.broadcast_manager import BroadcastManager
     from server.managers.file_transfer_server_manager import FileTransferServerManager
+    from server.storage.message_storage import MessageStorage
+    from server.storage.file_history_storage import FileHistoryStorage
     from shared.file_transfer_manager import FileTransferManager
 
 
@@ -40,6 +44,10 @@ class ChatServer:
         self.client_manager = ClientManager(self)
         self.broadcast_manager = BroadcastManager(self)
         self.file_transfer_server_manager = FileTransferServerManager(self)
+        
+        # Data storage for persistence
+        self.message_storage = MessageStorage()
+        self.file_history_storage = FileHistoryStorage()
         
         # Other components
         self.message_router = MessageRouter(self)
@@ -139,6 +147,34 @@ class ChatServer:
     def forward_file_transfer_complete(self, message, sender_username: str) -> bool:
         """Forward file transfer completion to the recipient."""
         return self.file_transfer_server_manager.forward_file_transfer_complete(message, sender_username)
+    
+    # Data persistence methods
+    def store_message(self, message, context_id: str = "common"):
+        """Store a message in the message storage."""
+        self.message_storage.store_message(message, context_id)
+    
+    def get_messages(self, context_id: str = "common", limit: Optional[int] = None):
+        """Get messages from storage."""
+        return self.message_storage.get_messages(context_id, limit)
+    
+    def get_private_contexts_for_user(self, username: str):
+        """Get private contexts for a user."""
+        return self.message_storage.get_private_contexts_for_user(username)
+    
+    def store_file_transfer(self, transfer_request, sender: str, recipient: str, status: str = "completed"):
+        """Store a file transfer in history."""
+        self.file_history_storage.store_file_transfer(transfer_request, sender, recipient, status)
+    
+    def get_file_transfers(self, username: str, limit: Optional[int] = None):
+        """Get file transfer history for a user."""
+        return self.file_history_storage.get_file_transfers(username, limit)
+    
+    def get_storage_stats(self):
+        """Get storage statistics."""
+        return {
+            'messages': self.message_storage.get_storage_stats(),
+            'file_transfers': self.file_history_storage.get_storage_stats()
+        }
     
     # Properties for backward compatibility
     @property
