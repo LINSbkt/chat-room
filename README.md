@@ -132,6 +132,43 @@ chat-room/
 - State management for consistent UI updates
 - Extensible architecture for future enhancements
 
+## Screenshots
+
+### Main Chat Interface
+- Clean, modern interface with user list and chat area
+- Real-time message updates
+- File transfer progress indicators
+
+### File Management
+- Dedicated file history panel
+- Easy file access and management
+- Visual indicators for file types and privacy
+
+## Architecture
+
+### Client-Server Architecture
+- **Server**: Handles message routing, user management, and file transfers
+- **Client**: Provides GUI interface and user interaction
+- **Shared**: Common message types and protocols
+
+### Message Flow
+1. Client sends message to server
+2. Server validates and routes message
+3. Server broadcasts to appropriate recipients
+4. Clients receive and display messages
+
+### Data Persistence
+- **In-memory storage** for chat messages and file metadata
+- **File system storage** for actual file content
+- **Session persistence** across user logins
+
+## Security Features
+
+- **Username validation** to prevent conflicts
+- **Message encryption** for secure communication
+- **File access control** based on user permissions
+- **Error handling** to prevent data corruption
+
 ## Development
 
 ### Code Style
@@ -145,9 +182,57 @@ chat-room/
 - Integration tests for workflows
 - Performance tests for scalability
 
+### Contributing Guidelines
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Add tests for new functionality
+5. Ensure all tests pass (`python -m pytest`)
+6. Commit your changes (`git commit -m 'Add amazing feature'`)
+7. Push to the branch (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
+
+## Troubleshooting
+
+### Common Issues
+
+**Connection Failed**
+- Ensure server is running before starting clients
+- Check firewall settings
+- Verify host and port configuration
+
+**File Transfer Issues**
+- Check available disk space
+- Ensure file permissions are correct
+- Verify file size limits
+
+**GUI Not Loading**
+- Ensure PySide6 is properly installed
+- Check Python version compatibility
+- Verify all dependencies are installed
+
+### Debug Mode
+Run with debug flag for detailed logging:
+```bash
+python run_server.py --debug
+python run_client.py --debug
+```
+
+## Performance
+
+### Scalability
+- Supports up to 100 concurrent users (configurable)
+- Efficient message routing and broadcasting
+- Optimized file transfer with chunking
+
+### Resource Usage
+- Minimal memory footprint
+- Efficient network usage
+- Cross-platform compatibility
+
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
@@ -160,3 +245,10 @@ This project is licensed under the MIT License.
 ## Support
 
 For issues and questions, please create an issue in the repository.
+
+## Acknowledgments
+
+- Built with Python 3.10+
+- GUI framework: PySide6
+- Encryption: Python Cryptography library
+- Testing: pytest framework
