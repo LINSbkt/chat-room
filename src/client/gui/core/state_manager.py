@@ -259,6 +259,10 @@ class StateKeys:
     MESSAGE_TYPE = "message.type"
     INPUT_TEXT = "message.input.text"
     
+    # Notification state
+    MESSAGE_NOTIFICATIONS = "notifications.messages"
+    UNREAD_COUNTS = "notifications.unread_counts"
+    
     # Connection state
     CONNECTION_STATUS = "connection.status"
     CONNECTION_ERROR = "connection.error"

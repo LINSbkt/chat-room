@@ -16,6 +16,8 @@ from ..components.chat.chat_display import ChatDisplay
 from ..components.chat.message_input import MessageInput
 from ..components.chat.file_transfer_input import FileTransferInput
 from ..components.users.user_list import UserList
+from ..components.notifications.notification_manager import NotificationManager
+from ..components.files.file_history import FileHistory
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +54,8 @@ class GUIController:
         self.component_registry.register_component_type("message_input", MessageInput)
         self.component_registry.register_component_type("file_transfer_input", FileTransferInput)
         self.component_registry.register_component_type("user_list", UserList)
+        self.component_registry.register_component_type("notification_manager", NotificationManager)
+        self.component_registry.register_component_type("file_history", FileHistory)
         
         logger.debug("Registered component types")
     
@@ -79,6 +83,14 @@ class GUIController:
                 parent_widget
             )
             self._components["chat_context_manager"] = context_manager
+            
+            # Create notification manager (invisible component)
+            notification_manager = self.component_registry.create_component(
+                "notification_manager",
+                "notification_manager",
+                parent_widget
+            )
+            self._components["notification_manager"] = notification_manager
             
             # Create main UI components
             chat_display = self.component_registry.create_component(
@@ -108,6 +120,13 @@ class GUIController:
                 parent_widget
             )
             self._components["user_list"] = user_list
+            
+            file_history = self.component_registry.create_component(
+                "file_history",
+                "file_history",
+                parent_widget
+            )
+            self._components["file_history"] = file_history
             
             logger.info("Created main window components")
             return self._components
@@ -160,6 +179,9 @@ class GUIController:
         
         # User list depends on context manager
         self.component_registry.set_component_dependencies("user_list", ["chat_context_manager"])
+        
+        # File history has no dependencies
+        self.component_registry.set_component_dependencies("file_history", [])
     
     def setup_main_window_layout(self, parent_widget: QWidget) -> None:
         """
@@ -192,18 +214,22 @@ class GUIController:
             if "file_transfer_input" in self._components:
                 chat_layout.addWidget(self._components["file_transfer_input"])
             
-            # Right panel - User list
-            user_widget = QWidget()
-            user_layout = QVBoxLayout(user_widget)
+            # Right panel - User list and File history
+            right_widget = QWidget()
+            right_layout = QVBoxLayout(right_widget)
             
             # Add user list
             if "user_list" in self._components:
-                user_layout.addWidget(self._components["user_list"])
+                right_layout.addWidget(self._components["user_list"])
+            
+            # Add file history
+            if "file_history" in self._components:
+                right_layout.addWidget(self._components["file_history"])
             
             # Add widgets to splitter
             splitter.addWidget(chat_widget)
-            splitter.addWidget(user_widget)
-            splitter.setSizes([600, 200])  # Default sizes
+            splitter.addWidget(right_widget)
+            splitter.setSizes([600, 300])  # Increased right panel size for file history
             
             logger.info("Set up main window layout")
             
@@ -229,6 +255,10 @@ class GUIController:
             
             # Connect chat client signals to event bus
             self._connect_chat_client_signals(chat_client)
+            
+            # Connect chat client to file history component
+            if "file_history" in self._components:
+                self._components["file_history"].set_chat_client(chat_client)
             
             logger.info(f"Connected chat client for user: {username}")
             
@@ -293,8 +323,8 @@ class GUIController:
                 "timestamp": getattr(message, 'timestamp', None)
             }
             
-            logger.debug(f"GUI Controller: Received {message_data['message_type']} message from {message_data['sender']}: {message_data['content'][:50]}...")
-            logger.debug(f"GUI Controller: Message details - is_private: {message_data['is_private']}, recipient: {message_data['recipient']}")
+            logger.info(f"🎯 GUI Controller: Received {message_data['message_type']} message from {message_data['sender']}: {message_data['content'][:50]}...")
+            logger.info(f"🎯 GUI Controller: Message details - is_private: {message_data['is_private']}, recipient: {message_data['recipient']}")
             
             # Publish message received event
             self.event_bus.publish(Event(
@@ -480,6 +510,13 @@ class GUIController:
     def _on_file_list_received(self, file_list: List[Dict[str, Any]]) -> None:
         """Handle file list received."""
         logger.debug(f"File list received: {len(file_list)} files")
+        
+        # Publish file list received event for components to handle
+        self.event_bus.publish(Event(
+            event_type=ChatEvents.FILE_LIST_RECEIVED,
+            data={"files": file_list},
+            source="gui_controller"
+        ))
     
     def _open_file(self, file_path: str) -> None:
         """Open a file with the default system application."""

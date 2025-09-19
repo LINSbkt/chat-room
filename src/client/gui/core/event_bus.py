@@ -181,6 +181,7 @@ class ChatEvents:
     FILE_TRANSFER_REQUESTED = "chat.file.transfer.requested"
     FILE_TRANSFER_PROGRESS = "chat.file.transfer.progress"
     FILE_TRANSFER_COMPLETE = "chat.file.transfer.complete"
+    FILE_LIST_RECEIVED = "chat.file.list.received"
     
     # System events
     CONNECTION_STATUS_CHANGED = "system.connection.changed"
