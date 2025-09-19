@@ -5,9 +5,9 @@ Selectable user list component for chat context creation.
 from typing import Dict, Any, Optional, List
 import logging
 from PySide6.QtWidgets import (QListWidget, QListWidgetItem, QVBoxLayout, 
-                              QLabel, QWidget)
+                              QLabel, QWidget, QHBoxLayout)
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QColor, QPainter, QBrush
 
 from ...core.event_bus import EventBus, Event, ChatEvents
 from ...core.state_manager import StateManager, StateKeys
@@ -57,6 +57,7 @@ class UserList(BaseComponent):
         self.subscribe_to_state(StateKeys.CURRENT_USER)
         self.subscribe_to_state(StateKeys.USER_LIST)
         self.subscribe_to_state(StateKeys.CURRENT_CHAT_CONTEXT)
+        self.subscribe_to_state(StateKeys.UNREAD_COUNTS)
     
     def on_initialize(self) -> None:
         """Initialize the user list."""
@@ -102,11 +103,21 @@ class UserList(BaseComponent):
         self.user_list.clear()
         
         # Add "Common Chat" option first
-        common_item = QListWidgetItem("🌐 Common Chat")
+        unread_counts = self.get_state(StateKeys.UNREAD_COUNTS, {})
+        common_unread_count = unread_counts.get("common", 0)
+        
+        if common_unread_count > 0:
+            common_text = "🌐 Common Chat 🔴"
+            common_tooltip = f"Public chat room for all users ({common_unread_count} new messages)"
+        else:
+            common_text = "🌐 Common Chat"
+            common_tooltip = "Public chat room for all users"
+        
+        common_item = QListWidgetItem(common_text)
         common_item.setData(Qt.ItemDataRole.UserRole, "common")
-        common_item.setToolTip("Public chat room for all users")
+        common_item.setToolTip(common_tooltip)
         self.user_list.addItem(common_item)
-        logger.debug("Added Common Chat item")
+        logger.debug(f"Added Common Chat item (unread: {common_unread_count})")
         
         # Add separator
         separator_item = QListWidgetItem("─" * 20)
@@ -123,14 +134,24 @@ class UserList(BaseComponent):
             # Add other users (excluding current user)
             for user in sorted_users:
                 if user != self.current_user:  # Don't show current user in the list
-                    item_text = f"👤 {user}"
-                    tooltip = f"Click to start private chat with {user}"
+                    # Check for notifications
+                    unread_counts = self.get_state(StateKeys.UNREAD_COUNTS, {})
+                    context_id = f"private_{user}_{self.current_user}" if user < self.current_user else f"private_{self.current_user}_{user}"
+                    unread_count = unread_counts.get(context_id, 0)
+                    
+                    # Create item text with notification indicator
+                    if unread_count > 0:
+                        item_text = f"👤 {user} 🔴"
+                        tooltip = f"Click to start private chat with {user} ({unread_count} new messages)"
+                    else:
+                        item_text = f"👤 {user}"
+                        tooltip = f"Click to start private chat with {user}"
                     
                     user_item = QListWidgetItem(item_text)
                     user_item.setData(Qt.ItemDataRole.UserRole, f"user_{user}")
                     user_item.setToolTip(tooltip)
                     self.user_list.addItem(user_item)
-                    logger.debug(f"Added user item: {user}")
+                    logger.debug(f"Added user item: {user} (unread: {unread_count})")
         
         # If no users, add a placeholder
         if not self.users:
@@ -219,7 +240,7 @@ class UserList(BaseComponent):
         # Emit signal
         self.common_chat_selected.emit()
         
-        logger.debug("Common chat selected")
+        logger.info(f"🔔 UserList: Published COMMON_CHAT_SELECTED event for context: common")
     
     def _select_user(self, username: str) -> None:
         """Select a user for private chat."""
@@ -236,7 +257,7 @@ class UserList(BaseComponent):
         # Emit signal
         self.user_selected.emit(username)
         
-        logger.debug(f"User selected for private chat: {username}")
+        logger.info(f"🔔 UserList: Published USER_SELECTED event for user: {username}")
     
     def _handle_user_list_updated(self, event: Event) -> None:
         """Handle user list updates."""
@@ -274,6 +295,11 @@ class UserList(BaseComponent):
             if current_user != self.current_user:
                 self.current_user = current_user
                 self._update_user_list()
+        
+        elif change.key == StateKeys.UNREAD_COUNTS:
+            # Notification counts changed, update display
+            self._update_user_list()
+            logger.info(f"🔔 Updated user list due to notification count changes")
         
         elif change.key == StateKeys.CURRENT_CHAT_CONTEXT:
             # Current context changed

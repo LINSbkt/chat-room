@@ -216,13 +216,25 @@ class ChatContextManager(BaseComponent):
         if len(context.messages) > 1000:
             context.messages = context.messages[-1000:]
         
+        # Update chat histories state so ChatDisplay can show the messages
+        self._update_chat_histories_state()
+        
         # Update state if this is the current context
         if context_id == self._current_context_id:
-            # Only update context list, not chat histories to prevent duplicate display
-            self.update_state(StateKeys.CHAT_CONTEXTS, self.get_context_list())
+            # Update context list
+            self.set_state(StateKeys.CHAT_CONTEXTS, self.get_context_list())
         
-        logger.debug(f"Added message to context {context_id}")
+        logger.info(f"✅ ChatContextManager: Added message to context {context_id}")
         return True
+    
+    def _update_chat_histories_state(self) -> None:
+        """Update the chat histories state with all context messages."""
+        chat_histories = {}
+        for context_id, context in self._contexts.items():
+            chat_histories[context_id] = context.messages.copy()
+        
+        self.set_state(StateKeys.CHAT_HISTORIES, chat_histories)
+        logger.debug(f"Updated chat histories state with {len(chat_histories)} contexts")
     
     def get_context_messages(self, context_id: str, limit: int = None) -> List[Dict[str, Any]]:
         """
@@ -300,10 +312,8 @@ class ChatContextManager(BaseComponent):
             StateKeys.CHAT_CONTEXTS: self.get_context_list()
         }
         
-        if current_context:
-            state_updates[StateKeys.CHAT_HISTORIES] = {
-                self._current_context_id: current_context.messages
-            }
+        # Update chat histories with all contexts
+        self._update_chat_histories_state()
         
         self.update_multiple_state(state_updates)
     
@@ -342,7 +352,7 @@ class ChatContextManager(BaseComponent):
         sender = message.get("sender")
         current_user = self.get_state(StateKeys.CURRENT_USER)
         
-        logger.debug(f"ChatContextManager: Received {message_type} message from {sender} (current user: {current_user}, is_private: {is_private})")
+        logger.info(f"🔄 ChatContextManager: Received {message_type} message from {sender} (current user: {current_user}, is_private: {is_private})")
         
         # Use both message_type and is_private to determine routing
         if message_type == "public" and not is_private:

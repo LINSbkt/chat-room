@@ -77,7 +77,7 @@ class ChatDisplay(BaseComponent):
         # Only display if it's for the current context
         current_context = self.get_state(StateKeys.CURRENT_CHAT_CONTEXT)
         if not current_context:
-            logger.debug("ChatDisplay: No current context, ignoring message")
+            logger.info(f"🚫 ChatDisplay: No current context, ignoring message from {message.get('sender', 'unknown')}")
             return
         
         # Determine if message belongs to current context
@@ -86,14 +86,14 @@ class ChatDisplay(BaseComponent):
         sender = message.get("sender")
         current_user = self.get_state(StateKeys.CURRENT_USER)
         
-        logger.debug(f"ChatDisplay: Received {message_type} message from {sender} in context {current_context} (is_private: {is_private})")
+        logger.info(f"📺 ChatDisplay: Received {message_type} message from {sender} in context {current_context} (is_private: {is_private})")
         
         # STRICT CONTEXT CHECKING: Only display messages that belong to current context
         if message_type == "public" and not is_private:
             # Public messages ONLY belong in common context
             if current_context == "common":
                 is_sent = (sender == current_user)
-                logger.debug(f"ChatDisplay: Displaying public message from {sender} in common context")
+                logger.info(f"✅ ChatDisplay: Displaying public message from {sender} in common context")
                 self._display_message(message, is_sent=is_sent)
             else:
                 logger.debug(f"ChatDisplay: Ignoring public message from {sender} - not in common context (current: {current_context})")
@@ -264,7 +264,7 @@ class ChatDisplay(BaseComponent):
         elif change.key == StateKeys.CHAT_HISTORIES:
             # Message history updated - don't reload all messages to prevent duplicates
             # Messages are already displayed when received via _handle_message_received
-            logger.debug("ChatDisplay: Chat histories updated, but not reloading to prevent duplicates")
+            logger.info(f"📺 ChatDisplay: Chat histories updated with {len(change.new_value)} contexts, but not reloading to prevent duplicates")
         
         elif change.key == StateKeys.CURRENT_USER:
             # User changed, clear display
