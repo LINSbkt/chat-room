@@ -1,7 +1,7 @@
 """
 Message input component with context-aware sending.
 """
-
+import emoji
 from typing import Dict, Any, Optional
 import logging
 from PySide6.QtWidgets import (QLineEdit, QPushButton, QHBoxLayout,
@@ -13,6 +13,7 @@ from ...core.event_bus import EventBus, Event, ChatEvents
 from ...core.state_manager import StateManager, StateKeys
 from ..base.base_component import BaseComponent
 from .emoji_picker import EmojiPicker
+from utils.fonts import get_emoji_font
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ class MessageInput(BaseComponent):
         # Message input field
         self.message_input = QLineEdit()
         self.message_input.setPlaceholderText("Type your message here...")
-        self.message_input.setFont(QFont("Consolas", 10))
+        self.message_input.setFont(get_emoji_font(12))  # QFont("Consolas", 10))
         self.message_input.returnPressed.connect(self._send_message)
         input_layout.addWidget(self.message_input)
 
@@ -73,6 +74,9 @@ class MessageInput(BaseComponent):
         layout.addLayout(input_layout)
 
         # Add Emoji button next to send button
+        emoji_font = get_emoji_font(12)
+        if self.message_input:
+            self.message_input.setFont(emoji_font)
         self.emoji_button = QPushButton("😊")
         self.emoji_button.clicked.connect(self._open_emoji_picker)
         input_layout.addWidget(self.emoji_button)
@@ -108,6 +112,11 @@ class MessageInput(BaseComponent):
         if not content:
             return
 
+        # Convert emoji shortcut
+        converted_content = emoji.emojize(content, language='alias')
+        content = converted_content if converted_content else content
+
+        # Get current user
         current_user = self.get_state(StateKeys.CURRENT_USER)
         if not current_user:
             logger.error("Cannot send message: no current user")
