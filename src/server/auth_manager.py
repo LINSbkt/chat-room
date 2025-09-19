@@ -19,8 +19,9 @@ class AuthManager:
     """Manages user authentication and sessions."""
     
     def __init__(self):
-        self.active_users: Dict[str, dict] = {}  # username -> user_info
+        self.active_users: Dict[str, dict] = {}  # username -> user_info (online users only)
         self.user_sessions: Dict[str, str] = {}  # client_id -> username
+        self.all_users: Dict[str, dict] = {}  # username -> user_info (all users, online and offline)
         self.lock = threading.Lock()
         
         # Setup logging
@@ -41,7 +42,8 @@ class AuthManager:
         if not all(c in allowed_chars for c in username):
             return False
         
-        # Check if username is already taken
+        # Check if username is already taken by an ONLINE user
+        # Allow re-login of offline users
         with self.lock:
             return username not in self.active_users
     
@@ -60,15 +62,34 @@ class AuthManager:
                 self.logger.info(f"Client {client_id} already authenticated as {old_username}")
                 return True
             
-            # Create user session
-            self.active_users[username] = {
-                'client_id': client_id,
-                'join_time': datetime.now(),
-                'last_activity': datetime.now()
-            }
+            # Check if this is a returning user
+            if username in self.all_users:
+                # Restore existing user data
+                user_info = self.all_users[username].copy()
+                user_info['client_id'] = client_id
+                user_info['last_activity'] = datetime.now()
+                user_info['is_online'] = True
+                user_info['last_seen'] = datetime.now()
+                
+                self.active_users[username] = user_info
+                self.logger.info(f"Returning user '{username}' re-authenticated with client {client_id}")
+            else:
+                # Create new user
+                user_info = {
+                    'client_id': client_id,
+                    'join_time': datetime.now(),
+                    'last_activity': datetime.now(),
+                    'is_online': True,
+                    'last_seen': datetime.now(),
+                    'total_sessions': 1
+                }
+                self.active_users[username] = user_info
+                self.logger.info(f"New user '{username}' authenticated with client {client_id}")
+            
+            # Update all_users registry
+            self.all_users[username] = self.active_users[username].copy()
             self.user_sessions[client_id] = username
             
-            self.logger.info(f"User '{username}' authenticated with client {client_id}")
             return True
     
     def get_username(self, client_id: str) -> Optional[str]:
@@ -83,22 +104,45 @@ class AuthManager:
             return user_info['client_id'] if user_info else None
     
     def get_active_usernames(self) -> list:
-        """Get list of all active usernames."""
+        """Get list of all active (online) usernames."""
         with self.lock:
             return list(self.active_users.keys())
     
+    def get_all_usernames(self) -> list:
+        """Get list of all usernames (both online and offline)."""
+        with self.lock:
+            return list(self.all_users.keys())
+    
     def get_user_count(self) -> int:
-        """Get number of active users."""
+        """Get number of active (online) users."""
         with self.lock:
             return len(self.active_users)
     
+    def get_total_user_count(self) -> int:
+        """Get total number of users (both online and offline)."""
+        with self.lock:
+            return len(self.all_users)
+    
     def disconnect_user(self, client_id: str) -> Optional[str]:
-        """Disconnect a user and clean up their session."""
+        """Disconnect a user but keep their data in server session."""
         with self.lock:
             username = self.user_sessions.pop(client_id, None)
             if username:
-                self.active_users.pop(username, None)
-                self.logger.info(f"User '{username}' disconnected (client {client_id})")
+                # Mark user as offline but keep their data
+                if username in self.active_users:
+                    user_info = self.active_users[username]
+                    user_info['is_online'] = False
+                    user_info['last_seen'] = datetime.now()
+                    
+                    # Update all_users registry with offline status
+                    self.all_users[username] = user_info.copy()
+                    
+                    # Remove from active_users (online list) but keep in all_users
+                    self.active_users.pop(username, None)
+                    
+                    self.logger.info(f"User '{username}' disconnected but data preserved (client {client_id})")
+                else:
+                    self.logger.warning(f"User '{username}' not found in active_users during disconnect")
                 return username
             return None
     
@@ -113,10 +157,20 @@ class AuthManager:
         with self.lock:
             return username in self.active_users
     
+    def is_user_registered(self, username: str) -> bool:
+        """Check if a user is registered (online or offline)."""
+        with self.lock:
+            return username in self.all_users
+    
     def get_user_info(self, username: str) -> Optional[dict]:
-        """Get user information."""
+        """Get user information (from active users only)."""
         with self.lock:
             return self.active_users.get(username)
+    
+    def get_all_user_info(self, username: str) -> Optional[dict]:
+        """Get user information (from all users, online or offline)."""
+        with self.lock:
+            return self.all_users.get(username)
     
     def cleanup_inactive_sessions(self, timeout_minutes: int = 30):
         """Clean up inactive sessions (for future use)."""

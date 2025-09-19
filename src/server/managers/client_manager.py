@@ -39,6 +39,11 @@ class ClientManager:
         if client_handler.client_id in self.active_clients:
             username = client_handler.username
             
+            # Remove from AuthManager to preserve user data
+            if username:
+                self.server.auth_manager.disconnect_user(client_handler.client_id)
+                self.logger.info(f"User '{username}' disconnected from AuthManager (data preserved)")
+            
             del self.active_clients[client_handler.client_id]
             self.logger.info(f"Client {client_handler.client_id} removed. Total clients: {len(self.active_clients)}")
             
