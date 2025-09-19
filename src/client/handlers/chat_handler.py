@@ -23,10 +23,12 @@ class ChatHandler:
     
     def handle_public_message(self, message):
         """Handle public message."""
+        self.logger.info(f"📥 CLIENT: Handling public message from {message.sender}: {message.content}")
         self.client_core.signals.message_received.emit(message)
     
     def handle_private_message(self, message):
         """Handle private message."""
+        self.logger.info(f"📥 CLIENT: Handling private message from {message.sender} to {message.recipient}: {message.content}")
         self.client_core.signals.message_received.emit(message)
     
     def handle_system_message(self, message):

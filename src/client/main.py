@@ -71,6 +71,10 @@ def main():
             # Show main window
             main_window.show()
             
+            # Wait a moment for GUI to fully initialize
+            import time
+            time.sleep(0.5)
+            
             # Request user list
             chat_client.request_user_list()
             
