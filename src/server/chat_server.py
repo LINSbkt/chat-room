@@ -165,6 +165,10 @@ class ChatServer:
         """Store a file transfer in history."""
         self.file_history_storage.store_file_transfer(transfer_request, sender, recipient, status)
     
+    def store_public_file_for_user(self, transfer_request, sender: str, recipient: str):
+        """Store a public file transfer record for a specific user."""
+        self.file_history_storage.store_public_file_for_user(transfer_request, sender, recipient)
+    
     def get_file_transfers(self, username: str, limit: Optional[int] = None):
         """Get file transfer history for a user."""
         return self.file_history_storage.get_file_transfers(username, limit)

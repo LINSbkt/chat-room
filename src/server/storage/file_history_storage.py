@@ -76,6 +76,33 @@ class FileHistoryStorage:
             
             self.logger.debug(f"Stored file transfer: {sender} -> {recipient}, {transfer_request.filename}")
     
+    def store_public_file_for_user(self, transfer_request: FileTransferRequest, sender: str, recipient: str):
+        """Store a public file transfer record for a specific user (when they accept it)."""
+        with self.lock:
+            if recipient not in self.file_transfers:
+                self.file_transfers[recipient] = []
+                self.transfer_counts[recipient] = 0
+            
+            transfer_record = {
+                'filename': transfer_request.filename,
+                'file_size': transfer_request.file_size,
+                'sender': sender,
+                'recipient': recipient,
+                'timestamp': datetime.now(),
+                'status': 'received',
+                'transfer_type': 'public'
+            }
+            
+            self.file_transfers[recipient].append(transfer_record)
+            self.transfer_counts[recipient] += 1
+            
+            # Maintain max transfer limit
+            if len(self.file_transfers[recipient]) > self.max_transfers_per_user:
+                self.file_transfers[recipient].pop(0)
+                self.transfer_counts[recipient] -= 1
+            
+            self.logger.debug(f"Stored public file transfer for user {recipient}: {transfer_request.filename}")
+    
     def get_file_transfers(self, username: str, limit: Optional[int] = None) -> List[dict]:
         """Get file transfer history for a user."""
         with self.lock:

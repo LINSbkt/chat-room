@@ -3,6 +3,7 @@ Server file transfer handler.
 """
 
 import logging
+from datetime import datetime
 try:
     from ...shared.message_types import (FileTransferRequest, FileTransferResponse, 
                                        FileChunk, FileTransferComplete, FileListRequest, 
@@ -32,6 +33,11 @@ class ServerFileHandler:
         try:
             self.logger.info(f"📤 File transfer request from {self.client_connection.username}: "
                            f"{message.filename} ({message.file_size} bytes) to {message.recipient}")
+            
+            # Store file transfer record for the sender
+            self.client_connection.server.store_file_transfer(
+                message, self.client_connection.username, message.recipient, "sent"
+            )
             
             # Handle global file transfers
             if message.recipient == "GLOBAL":
@@ -95,6 +101,9 @@ class ServerFileHandler:
             self.logger.info(f"📥 File transfer response from {self.client_connection.username}: "
                            f"{'accepted' if message.accepted else 'declined'}")
             
+            # Note: File transfer records will be stored when the transfer completes successfully
+            # This ensures we have all the file information available and avoids complex error handling
+            
             # Find the original sender and forward the response
             success = self.client_connection.server.forward_file_transfer_response(
                 message, self.client_connection.username)
@@ -136,6 +145,51 @@ class ServerFileHandler:
         try:
             self.logger.info(f"📋 File transfer complete from {self.client_connection.username}: "
                            f"{'success' if message.success else 'failed'} for transfer {message.transfer_id}")
+            
+            # If successful, store a simple file transfer record for the recipient
+            if message.success:
+                try:
+                    # Get transfer info from the server manager
+                    transfer_info = self.client_connection.server.file_transfer_server_manager.active_file_transfers.get(message.transfer_id)
+                    if transfer_info:
+                        sender = transfer_info.get('sender')
+                        recipient = transfer_info.get('recipient')
+                        
+                        # Create a simple file transfer record for the recipient
+                        # We'll use basic information and let the file access controller handle the rest
+                        if hasattr(self.client_connection.server, 'file_history_storage'):
+                            try:
+                                # Create a minimal transfer record
+                                transfer_record = {
+                                    'filename': 'unknown',  # Will be filled in by file access controller
+                                    'file_size': 0,         # Will be filled in by file access controller
+                                    'sender': sender or 'unknown',
+                                    'recipient': recipient or 'unknown',
+                                    'timestamp': datetime.now(),
+                                    'status': 'completed',
+                                    'transfer_type': 'private' if recipient != 'GLOBAL' else 'public'
+                                }
+                                
+                                # Add to recipient's file history
+                                if self.client_connection.username not in self.client_connection.server.file_history_storage.file_transfers:
+                                    self.client_connection.server.file_history_storage.file_transfers[self.client_connection.username] = []
+                                    self.client_connection.server.file_history_storage.transfer_counts[self.client_connection.username] = 0
+                                
+                                self.client_connection.server.file_history_storage.file_transfers[self.client_connection.username].append(transfer_record)
+                                self.client_connection.server.file_history_storage.transfer_counts[self.client_connection.username] += 1
+                                
+                                # Maintain max transfer limit
+                                if len(self.client_connection.server.file_history_storage.file_transfers[self.client_connection.username]) > self.client_connection.server.file_history_storage.max_transfers_per_user:
+                                    self.client_connection.server.file_history_storage.file_transfers[self.client_connection.username].pop(0)
+                                    self.client_connection.server.file_history_storage.transfer_counts[self.client_connection.username] -= 1
+                                
+                                self.logger.info(f"📋 Stored completed file transfer record for {self.client_connection.username} from {sender}")
+                            except Exception as e:
+                                self.logger.error(f"Error creating file transfer record: {e}")
+                        else:
+                            self.logger.warning("File history storage not available")
+                except Exception as e:
+                    self.logger.error(f"Error storing file transfer completion record: {e}")
             
             # Forward completion notification
             success = self.client_connection.server.forward_file_transfer_complete(
