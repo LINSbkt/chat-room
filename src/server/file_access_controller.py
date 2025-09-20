@@ -42,6 +42,23 @@ class FileAccessController:
             accessible_files = self.get_user_accessible_files(user)
             file_list = []
             
+            # Get file transfer history to include sender and timestamp information
+            file_history = {}
+            if hasattr(self.server, 'file_history_storage'):
+                # Get all file transfers for this user
+                transfers = self.server.file_history_storage.get_file_transfers(user)
+                for transfer in transfers:
+                    # Create a key based on filename and path to match with accessible files
+                    filename = transfer.get('filename', '')
+                    # Try to match with accessible files by filename
+                    for file_path in accessible_files:
+                        if os.path.basename(file_path) == filename:
+                            # Only store if we don't already have a match for this file
+                            # This ensures we get the most recent transfer record
+                            if file_path not in file_history:
+                                file_history[file_path] = transfer
+                            break
+            
             for file_path in accessible_files:
                 if os.path.exists(file_path):
                     try:
@@ -53,12 +70,31 @@ class FileAccessController:
                         normalized_path = os.path.normpath(file_path)
                         is_public = 'storages' + os.sep + 'public' in normalized_path
                         
+                        # Get additional metadata from file history if available
+                        transfer_info = file_history.get(file_path, {})
+                        sender = transfer_info.get('sender', 'Unknown')
+                        timestamp = transfer_info.get('timestamp')
+                        
+                        # Format timestamp for display
+                        if timestamp:
+                            if hasattr(timestamp, 'strftime'):
+                                timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                            else:
+                                timestamp_str = str(timestamp)
+                        else:
+                            # Fallback to file modification time
+                            import time
+                            mod_time = os.path.getmtime(file_path)
+                            timestamp_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(mod_time))
+                        
                         file_info = {
                             'filename': filename,
                             'file_path': file_path,
                             'file_size': file_size,
                             'is_public': is_public,
-                            'accessible': True
+                            'accessible': True,
+                            'sender': sender,
+                            'timestamp': timestamp_str
                         }
                         file_list.append(file_info)
                     except Exception as e:
