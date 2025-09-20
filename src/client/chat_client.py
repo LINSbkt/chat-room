@@ -55,6 +55,10 @@ class ChatClient:
         """Request updated user list."""
         return self.core.request_user_list()
     
+    def request_file_list(self) -> bool:
+        """Request file list from server."""
+        return self.file_handler.request_file_list()
+    
     # File transfer methods - delegate to file handler
     def send_file(self, file_path: str, recipient: str) -> bool:
         """Send a file to a recipient."""
