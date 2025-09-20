@@ -47,21 +47,19 @@ class FileHandler:
                 if success:
                     self.logger.info(f"📥 Set up incoming transfer {transfer_id} for {message.filename}")
                     
-                    # For GLOBAL transfers, automatically accept without showing dialog
-                    if not message.is_private:  # GLOBAL transfer
-                        self.logger.info(f"📥 Auto-accepting GLOBAL file transfer: {message.filename}")
-                        self.client_core.signals.system_message.emit(f"📥 Receiving file: {message.filename} from {message.sender}")
-                        
-                        # Send acceptance response immediately
-                        try:
-                            from ...shared.message_types import FileTransferResponse
-                        except ImportError:
-                            from shared.message_types import FileTransferResponse
-                        response = FileTransferResponse(transfer_id, True)
-                        self.client_core.send_message(response)
-                    else:
-                        # For private transfers, show the dialog
-                        self.client_core.signals.file_transfer_request.emit(message)
+                    # Auto-accept all file transfers (both public and private)
+                    print(f"🔥 DEBUG: AUTO-ACCEPTING FILE TRANSFER: {message.filename} from {message.sender}")
+                    self.logger.info(f"📥 Auto-accepting file transfer: {message.filename} from {message.sender}")
+                    self.client_core.signals.system_message.emit(f"📥 Auto-receiving file: {message.filename} from {message.sender}")
+                    
+                    # Send acceptance response immediately
+                    try:
+                        from ...shared.message_types import FileTransferResponse
+                    except ImportError:
+                        from shared.message_types import FileTransferResponse
+                    response = FileTransferResponse(transfer_id, True)
+                    print(f"🔥 DEBUG: SENDING AUTO-ACCEPT RESPONSE FOR: {transfer_id}")
+                    self.client_core.send_message(response)
                 else:
                     self.logger.error(f"Failed to set up incoming transfer {transfer_id}")
                     self.client_core.signals.system_message.emit("Failed to prepare for file transfer")
@@ -120,14 +118,26 @@ class FileHandler:
             if message.success:
                 self.logger.info(f"✅ File transfer completed successfully: {message.transfer_id}")
                 
-                # Only emit GUI signal if this user was the recipient (has a received file)
-                if transfer and transfer.get('direction') == 'incoming' and 'file_path' in transfer:
-                    file_path = transfer['file_path']
-                    self.client_core.signals.file_transfer_complete.emit(
-                        message.transfer_id, True, file_path
-                    )
+                # Emit GUI signal for both incoming and outgoing transfers
+                if transfer:
+                    if transfer.get('direction') == 'incoming' and 'file_path' in transfer:
+                        # This is a file we received
+                        file_path = transfer['file_path']
+                        print(f"🔥 DEBUG: FILE HANDLER - Emitting file_transfer_complete signal for INCOMING file: {file_path}")
+                        self.client_core.signals.file_transfer_complete.emit(
+                            message.transfer_id, True, file_path
+                        )
+                    elif transfer.get('direction') == 'outgoing':
+                        # This is a file we sent - emit signal to refresh file list
+                        # We don't have a file_path for outgoing transfers, so we'll use the transfer_id
+                        print(f"🔥 DEBUG: FILE HANDLER - Emitting file_transfer_complete signal for OUTGOING file: {message.transfer_id}")
+                        self.client_core.signals.file_transfer_complete.emit(
+                            message.transfer_id, True, f"outgoing:{message.transfer_id}"
+                        )
+                        self.logger.info(f"📤 Emitted completion signal for sent file: {message.transfer_id}")
                 else:
                     # This is a completion notification for a file we sent - just log it
+                    print(f"🔥 DEBUG: FILE HANDLER - No transfer found for completion: {message.transfer_id}")
                     self.logger.info(f"📤 Received confirmation that sent file was completed: {message.transfer_id}")
             else:
                 self.logger.error(f"❌ File transfer failed: {message.transfer_id} - {message.error_message}")

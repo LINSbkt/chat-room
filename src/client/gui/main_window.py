@@ -417,40 +417,12 @@ class MainWindow(QMainWindow):
     
     @Slot(object)
     def on_file_transfer_request(self, request):
-        """Handle incoming file transfer request."""
+        """Handle incoming file transfer request - now auto-accepted, so this is just for logging."""
         filename = request.filename  # Use property, not data dict
         sender = request.sender or 'Unknown user'
-        file_size = request.file_size  # Use property, not data dict
         
-        # Format file size
-        if file_size > 1024 * 1024:
-            size_str = f"{file_size / (1024 * 1024):.1f} MB"
-        elif file_size > 1024:
-            size_str = f"{file_size / 1024:.1f} KB"
-        else:
-            size_str = f"{file_size} bytes"
-        
-        # Show dialog asking user to accept or decline
-        reply = QMessageBox.question(
-            self, 
-            "File Transfer Request", 
-            f"{sender} wants to send you a file:\n\n"
-            f"📁 {filename}\n"
-            f"📏 Size: {size_str}\n\n"
-            f"Do you want to accept this file?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        
-        if reply == QMessageBox.StandardButton.Yes:
-            # Accept the file transfer
-            transfer_id = request.transfer_id or request.message_id  # Use property
-            self.chat_client.accept_file_transfer(transfer_id)
-            self.display_system_message(f"📥 Accepting file '{filename}' from {sender}")
-        else:
-            # Decline the file transfer
-            transfer_id = request.transfer_id or request.message_id  # Use property
-            self.chat_client.decline_file_transfer(transfer_id)
-            self.display_system_message(f"❌ Declined file '{filename}' from {sender}")
+        # File transfers are now auto-accepted, so we just log this
+        print(f"DEBUG: File transfer request received and auto-accepted: {filename} from {sender}")
     
     @Slot(str, int, int)
     def on_file_transfer_progress(self, transfer_id, current, total):
@@ -485,17 +457,9 @@ class MainWindow(QMainWindow):
             # Add to downloads list
             self.add_to_downloads_list(filename, file_path)
             
-            # Show success message with option to open file
-            reply = QMessageBox.question(
-                self, 
-                "File Transfer Complete", 
-                f"File '{filename}' has been downloaded successfully!\n\nWould you like to open it?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.Yes
-            )
-            
-            if reply == QMessageBox.StandardButton.Yes:
-                self.open_file(file_path)
+            # File transfer completed successfully - no dialog needed
+            # Users can open files from the received files box if they want
+            print(f"DEBUG: File transfer completed successfully: {filename}")
         else:
             self.display_system_message(f"❌ File transfer failed: {transfer_id}")
     

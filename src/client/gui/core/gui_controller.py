@@ -400,58 +400,15 @@ class GUIController:
             logger.error(f"Error handling connection status change: {e}")
     
     def _on_file_transfer_request(self, request) -> None:
-        """Handle file transfer request."""
+        """Handle file transfer request - now auto-accepted, so this is just for logging."""
         try:
-            from PySide6.QtWidgets import QMessageBox
-            
             filename = getattr(request, 'filename', request.data.get('filename', 'Unknown file'))
             sender = getattr(request, 'sender', request.data.get('sender', 'Unknown user'))
-            file_size = getattr(request, 'file_size', request.data.get('file_size', 0))
             
-            # Format file size
-            if file_size > 1024 * 1024:
-                size_str = f"{file_size / (1024 * 1024):.1f} MB"
-            elif file_size > 1024:
-                size_str = f"{file_size / 1024:.1f} KB"
-            else:
-                size_str = f"{file_size} bytes"
+            # File transfers are now auto-accepted, so we just log this
+            print(f"🔥 DEBUG: GUI CONTROLLER - File transfer request received (should be auto-accepted): {filename} from {sender}")
+            logger.info(f"File transfer request received and auto-accepted: {filename} from {sender}")
             
-            # Show dialog asking user to accept or decline
-            reply = QMessageBox.question(
-                None, 
-                "File Transfer Request", 
-                f"{sender} wants to send you a file:\n\n"
-                f"📁 {filename}\n"
-                f"📏 Size: {size_str}\n\n"
-                f"Do you want to accept this file?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
-            
-            if reply == QMessageBox.StandardButton.Yes:
-                # Accept the file transfer
-                transfer_id = getattr(request, 'transfer_id', request.data.get('transfer_id', request.message_id))
-                self._chat_client.accept_file_transfer(transfer_id)
-                logger.info(f"Accepted file transfer: {filename} from {sender}")
-                
-                # Show system message
-                self.event_bus.publish(Event(
-                    event_type=ChatEvents.SYSTEM_MESSAGE,
-                    data={"message": f"📥 Accepting file '{filename}' from {sender}"},
-                    source="gui_controller"
-                ))
-            else:
-                # Decline the file transfer
-                transfer_id = getattr(request, 'transfer_id', request.data.get('transfer_id', request.message_id))
-                self._chat_client.decline_file_transfer(transfer_id)
-                logger.info(f"Declined file transfer: {filename} from {sender}")
-                
-                # Show system message
-                self.event_bus.publish(Event(
-                    event_type=ChatEvents.SYSTEM_MESSAGE,
-                    data={"message": f"❌ Declined file '{filename}' from {sender}"},
-                    source="gui_controller"
-                ))
-                
         except Exception as e:
             logger.error(f"Error handling file transfer request: {e}")
     
@@ -467,27 +424,54 @@ class GUIController:
             import os
             
             if success and file_path:
-                filename = os.path.basename(file_path)
-                logger.info(f"File transfer completed successfully: {filename}")
-                
-                # Show system message
-                self.event_bus.publish(Event(
-                    event_type=ChatEvents.SYSTEM_MESSAGE,
-                    data={"message": f"✅ File transfer completed: {filename}"},
-                    source="gui_controller"
-                ))
-                
-                # Show success message with option to open file
-                reply = QMessageBox.question(
-                    None, 
-                    "File Transfer Complete", 
-                    f"File '{filename}' has been downloaded successfully!\n\nWould you like to open it?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.Yes
-                )
-                
-                if reply == QMessageBox.StandardButton.Yes:
-                    self._open_file(file_path)
+                # Check if this is an outgoing transfer (file we sent)
+                if file_path.startswith("outgoing:"):
+                    logger.info(f"File transfer completed successfully (outgoing): {transfer_id}")
+                    
+                    # Show system message
+                    self.event_bus.publish(Event(
+                        event_type=ChatEvents.SYSTEM_MESSAGE,
+                        data={"message": f"✅ File sent successfully"},
+                        source="gui_controller"
+                    ))
+                    
+                    # Publish file transfer complete event for components to handle
+                    self.event_bus.publish(Event(
+                        event_type=ChatEvents.FILE_TRANSFER_COMPLETE,
+                        data={
+                            "transfer_id": transfer_id,
+                            "success": success,
+                            "file_path": file_path
+                        },
+                        source="gui_controller"
+                    ))
+                else:
+                    # This is an incoming transfer (file we received)
+                    filename = os.path.basename(file_path)
+                    logger.info(f"File transfer completed successfully: {filename}")
+                    
+                    # Show system message
+                    self.event_bus.publish(Event(
+                        event_type=ChatEvents.SYSTEM_MESSAGE,
+                        data={"message": f"✅ File transfer completed: {filename}"},
+                        source="gui_controller"
+                    ))
+                    
+                    # Publish file transfer complete event for components to handle
+                    print(f"🔥 DEBUG: PUBLISHING FILE_TRANSFER_COMPLETE EVENT FOR: {filename}")
+                    self.event_bus.publish(Event(
+                        event_type=ChatEvents.FILE_TRANSFER_COMPLETE,
+                        data={
+                            "transfer_id": transfer_id,
+                            "success": success,
+                            "file_path": file_path
+                        },
+                        source="gui_controller"
+                    ))
+                    
+                    # File transfer completed successfully - no dialog needed
+                    # Users can open files from the received files box if they want
+                    logger.info(f"File transfer completed successfully: {filename}")
             else:
                 logger.error(f"File transfer failed: {transfer_id}")
                 
@@ -495,6 +479,17 @@ class GUIController:
                 self.event_bus.publish(Event(
                     event_type=ChatEvents.SYSTEM_MESSAGE,
                     data={"message": f"❌ File transfer failed: {transfer_id}"},
+                    source="gui_controller"
+                ))
+                
+                # Publish file transfer complete event for components to handle (even for failures)
+                self.event_bus.publish(Event(
+                    event_type=ChatEvents.FILE_TRANSFER_COMPLETE,
+                    data={
+                        "transfer_id": transfer_id,
+                        "success": success,
+                        "file_path": file_path
+                    },
                     source="gui_controller"
                 ))
                 
