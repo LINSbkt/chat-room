@@ -104,15 +104,20 @@ class FileHistory(BaseComponent):
     
     def _refresh_file_list(self) -> None:
         """Refresh the file list by requesting from server."""
+        print(f"🔥 DEBUG: FILE HISTORY - _refresh_file_list called, current_user={self.current_user}")
+        
         if not self.current_user:
             logger.warning("Cannot refresh file list: no current user")
+            print(f"🔥 DEBUG: FILE HISTORY - Cannot refresh: no current user")
             return
         
         # Request file list from server
         if hasattr(self, '_chat_client') and self._chat_client:
+            print(f"🔥 DEBUG: FILE HISTORY - Requesting file list from server")
             self._chat_client.request_file_list()
         else:
             logger.warning("Cannot refresh file list: no chat client available")
+            print(f"🔥 DEBUG: FILE HISTORY - Cannot refresh: no chat client available")
     
     def _on_selection_changed(self) -> None:
         """Handle file list selection change."""
@@ -217,6 +222,9 @@ class FileHistory(BaseComponent):
     def _handle_file_list_received(self, event: Event) -> None:
         """Handle file list received from server."""
         file_list = event.data.get("files", [])
+        print(f"🔥 DEBUG: FILE HISTORY - Received file list from server: {len(file_list)} files")
+        for i, file_info in enumerate(file_list):
+            print(f"🔥 DEBUG: FILE HISTORY - File {i+1}: {file_info.get('filename', 'unknown')} from {file_info.get('sender', 'unknown')}")
         self._update_file_list(file_list)
     
     def _handle_file_transfer_complete(self, event: Event) -> None:
@@ -225,10 +233,15 @@ class FileHistory(BaseComponent):
         success = event.data.get("success", False)
         file_path = event.data.get("file_path")
         
+        print(f"🔥 DEBUG: FILE HISTORY - Received FILE_TRANSFER_COMPLETE event: transfer_id={transfer_id}, success={success}, file_path={file_path}")
+        
         if success and file_path:
             # Refresh file list to include the new file
+            print(f"🔥 DEBUG: FILE HISTORY - Refreshing file list for completed transfer: {file_path}")
             self._refresh_file_list()
             logger.info(f"File transfer completed, refreshing file list: {file_path}")
+        else:
+            print(f"🔥 DEBUG: FILE HISTORY - Not refreshing file list: success={success}, file_path={file_path}")
     
     def _update_file_list(self, file_list: List[Dict[str, Any]]) -> None:
         """Update the file list display."""
