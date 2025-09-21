@@ -5,14 +5,18 @@ Client main entry point.
 import sys
 import argparse
 import logging
+import qtmodern.styles
+import qtmodern.windows
+import sys
+import os
+from qt_material import apply_stylesheet
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox
 try:
     from .chat_client import ChatClient
     from .gui.refactored_main_window import RefactoredMainWindow as MainWindow
     from .gui.dialogs.login_dialog import LoginDialog
 except ImportError:
-    import sys
-    import os
     sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
     from client.chat_client import ChatClient
     from client.gui.refactored_main_window import RefactoredMainWindow as MainWindow
@@ -22,65 +26,79 @@ except ImportError:
 def main():
     """Main client entry point."""
     parser = argparse.ArgumentParser(description='Chatroom Client')
-    parser.add_argument('--server', default='localhost', help='Server host (default: localhost)')
-    parser.add_argument('--port', type=int, default=8888, help='Server port (default: 8888)')
-    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
-    
+    parser.add_argument('--server', default='localhost',
+                        help='Server host (default: localhost)')
+    parser.add_argument('--port', type=int, default=8888,
+                        help='Server port (default: 8888)')
+    parser.add_argument('--debug', action='store_true',
+                        help='Enable debug logging')
+
     args = parser.parse_args()
-    
+
     # Setup logging
     log_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(
         level=log_level,
         format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
     )
-    
+
     logger = logging.getLogger(__name__)
-    
+
     # Create Qt application
     app = QApplication(sys.argv)
-    
+
+    # Apply Material Design stylesheet
+    apply_stylesheet(app, theme='dark_teal.xml')
+    # Setup modern window style
+    #qtmodern.styles.dark(app)
+
     try:
         # Authentication loop - retry on failure
         while True:
             # Show login dialog
             login_dialog = LoginDialog()
+            apply_stylesheet(login_dialog, theme='dark_teal.xml')
             if login_dialog.exec() != login_dialog.DialogCode.Accepted:
                 sys.exit(0)
-            
+
             username = login_dialog.get_username()
-            
+
             # Create chat client
             chat_client = ChatClient(args.server, args.port)
-            
+
             # Create main window
             main_window = MainWindow()
             main_window.set_chat_client(chat_client, username)
+
+            # Wrap main window in modern window
+            main_window = qtmodern.windows.ModernWindow(main_window)
             
             # Connect to server
             if not chat_client.connect(username):
-                QMessageBox.critical(None, "Connection Error", "Failed to connect to server")
+                QMessageBox.critical(
+                    None, "Connection Error", "Failed to connect to server")
                 continue  # Retry login
-            
+
             # Wait for authentication
             if not chat_client.wait_for_authentication(timeout=5.0):
-                QMessageBox.critical(None, "Authentication Error", "Authentication failed or timed out")
+                QMessageBox.critical(
+                    None, "Authentication Error", "Authentication failed or timed out")
                 chat_client.disconnect()
                 continue  # Retry login
-            
+
             # Show main window
             main_window.show()
-            
+
             # Wait a moment for GUI to fully initialize
             import time
             time.sleep(0.5)
-            
+
             # Request user list
             chat_client.request_user_list()
-            
+
             # Start Qt event loop
             result = app.exec()
-            
+
             # If we get here, the main window was closed
             # Check if it was due to authentication failure
             if not chat_client.connected:
@@ -89,7 +107,7 @@ def main():
             else:
                 # Normal exit
                 sys.exit(result)
-        
+
     except Exception as e:
         logger.error(f"Client error: {e}")
         QMessageBox.critical(None, "Error", f"Client error: {e}")

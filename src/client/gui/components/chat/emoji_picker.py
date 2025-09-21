@@ -31,7 +31,7 @@ class EmojiPicker(QDialog):
         self.max_recent_emojis = max_recent_emojis
         self.username = username
         self.setWindowTitle("Emoji Picker")
-        self.resize(250, 300)
+        self.resize(300, 350)
         # Path to recent emojis JSON file
         self.recent_file_path = recent_file_path
 
@@ -86,8 +86,8 @@ class EmojiPicker(QDialog):
     def _create_grid_tab(self):
         tab = QWidget()
         grid = QGridLayout(tab)
-        grid.setSpacing(0)
-        grid.setContentsMargins(0, 0, 0, 0)
+        #grid.setSpacing(0)
+        #grid.setContentsMargins(0, 0, 0, 0)
         return tab, grid
 
     # ----------- Data Handling -----------
@@ -154,14 +154,14 @@ class EmojiPicker(QDialog):
                     self.emoji_list.addItem(list_item)
 
     def _populate_grid(self, grid, emojis):
-        cols = 6
+        cols = 5
         emojis = dict(sorted(emojis.items()))  # sort by name
         for idx, (name, emoji) in enumerate(emojis.items()):
             row = idx // cols
             col = idx % cols
             btn = QPushButton(emoji)
             btn.setToolTip(name)
-            btn.setFixedSize(36, 36)
+            btn.setMinimumSize(30, 30)
             btn.setFlat(True)
             btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
             btn.clicked.connect(lambda checked,
@@ -185,7 +185,7 @@ class EmojiPicker(QDialog):
         # Clear existing buttons
         self._clear_layout(self.recent_grid)
 
-        cols = 6  # number of columns
+        cols = 5  # number of columns
         self._populate_grid(
             self.recent_grid,
             {f"recent_{i}": e for i, e in enumerate(self.recent_emojis)},
