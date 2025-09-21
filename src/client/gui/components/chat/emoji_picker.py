@@ -25,23 +25,22 @@ class EmojiPicker(QDialog):
 
     def __init__(self, parent=None,
                  username: str = "guest",
-                 max_recent_emojis=10):
+                 max_recent_emojis=10,
+                 recent_file_path: str = None):
         super().__init__(parent)
         self.max_recent_emojis = max_recent_emojis
         self.username = username
         self.setWindowTitle("Emoji Picker")
         self.resize(250, 300)
+        # Path to recent emojis JSON file
+        self.recent_file_path = recent_file_path
+
         # Load emoji data
         # All emojis
         self.emoji_map = self.load_emoji_json()
         # Recent used emojis
         self.recent_emojis = self.load_user_recent_emojis_json()
-        # Code to emoji mapping for replacement
-        self.code_to_emoji = {
-            f":{name}:": e
-            for category in self.emoji_map.values()
-            for name, e in category.items()
-        }
+
         # Setup UI
         self._setup_ui()
 
@@ -55,8 +54,6 @@ class EmojiPicker(QDialog):
         # Recent tab
         self.recent_tab = QWidget()
         self.recent_grid = QGridLayout(self.recent_tab)
-        # self.recent_grid.setSpacing(0)
-        # self.recent_grid.setContentsMargins(0, 0, 0, 0)
         self.tabs.addTab(self.recent_tab, "Recent")
 
         # All emojis tab
@@ -108,6 +105,9 @@ class EmojiPicker(QDialog):
 
     def recent_emojis_json_path(self) -> str:
         """Shared JSON for all users (nested dict by username)."""
+        if self.recent_file_path:
+            return self.recent_file_path
+        # default path
         base_dir = os.path.join(os.path.dirname(__file__), "../assets")
         os.makedirs(base_dir, exist_ok=True)  # Ensure folder exists
         return os.path.join(base_dir, "users_recent_emojis.json")
@@ -126,6 +126,7 @@ class EmojiPicker(QDialog):
 
     def save_recent_json(self) -> None:
         path = self.recent_emojis_json_path()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         try:
             if os.path.exists(path):
                 with open(path, "r", encoding="utf-8") as f:
@@ -216,4 +217,3 @@ class EmojiPicker(QDialog):
         self.recent_emojis.insert(0, emoji)
         # keep only last 10
         self.recent_emojis = self.recent_emojis[: self.max_recent_emojis]
-
