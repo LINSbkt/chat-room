@@ -11,7 +11,7 @@ import sys
 import os
 from qt_material import apply_stylesheet
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QMessageBox, QStyleFactory
 try:
     from .chat_client import ChatClient
     from .gui.refactored_main_window import RefactoredMainWindow as MainWindow
@@ -49,8 +49,9 @@ def main():
 
     # Apply Material Design stylesheet
     apply_stylesheet(app, theme='dark_teal.xml')
+
     # Setup modern window style
-    #qtmodern.styles.dark(app)
+    # qtmodern.styles.dark(app)
 
     try:
         # Authentication loop - retry on failure

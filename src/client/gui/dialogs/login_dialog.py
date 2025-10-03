@@ -23,7 +23,7 @@ class LoginDialog(QDialog):
         icon_path = os.path.join(
             base_dir, "components", "assets", "app_logo.png")
 
-        #print("Icon path:", icon_path, "Exists:", os.path.exists(icon_path))
+        # print("Icon path:", icon_path, "Exists:", os.path.exists(icon_path))
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
         self.setWindowTitle("Login to Chatroom")
