@@ -66,12 +66,14 @@ class ChatDisplay(BaseComponent):
 
     def on_initialize(self) -> None:
         """Initialize the chat display."""
-        # Initialize message formatter
-        self.message_formatter = MessageFormatter()
-
+        # Initialize message formatter with ColorManager
+        from ...core.color_manager import ColorManager
+        color_manager = ColorManager()
+        self.message_formatter = MessageFormatter(color_manager)
+        
         # Load current context messages
         self._load_current_context_messages()
-
+        
         logger.info("Chat display component initialized")
 
     def _handle_message_received(self, event: Event) -> None:
@@ -239,23 +241,21 @@ class ChatDisplay(BaseComponent):
             return
 
         # Format the message
-        formatted_message = self.message_formatter.format_message(
-            message, is_sent)
+        formatted_message = self.message_formatter.format_message(message, is_sent)
 
-        # Add to display
-        message_type = message.get("message_type", "public")
-        if message_type != "system":
-            # Color coding based on sender and message type
-            sender = message.get("sender", "Unknown")
-            color = self.message_formatter.get_sender_color(sender, is_sent)
-            self.message_display.setTextColor(color)
+        # Get current user for color determination
+        current_user = self.get_state(StateKeys.CURRENT_USER)
+        
+        # Get appropriate color using ColorManager
+        color = self.message_formatter.get_message_color(message, current_user)
+        self.message_display.setTextColor(color)
+        
         self.message_display.append(formatted_message)
 
         # Auto-scroll to bottom
         self._scroll_to_bottom()
 
-        logger.debug(
-            f"ChatDisplay: Displayed message from {message.get('sender', 'Unknown')}: {message.get('content', '')[:50]}...")
+        logger.debug(f"ChatDisplay: Displayed message from {message.get('sender', 'Unknown')}: {message.get('content', '')[:50]}...")
 
     def _display_system_message(self, message_text: str) -> None:
         """Display a system message."""
@@ -265,10 +265,12 @@ class ChatDisplay(BaseComponent):
         timestamp = datetime.now().strftime("%H:%M:%S")
         formatted_message = f"(System) ({timestamp}) {message_text}"
 
-        # Add to display with color coding
-        # self.message_display.setTextColor(QColor(0, 200, 180))  # Blue for system messages
+        # Get system color using ColorManager
+        if self.message_formatter.color_manager:
+            color = self.message_formatter.color_manager.get_system_color(message_text)
+            self.message_display.setTextColor(color)
+        
         self.message_display.append(formatted_message)
-        # self.message_display.setTextColor(QColor(255, 255, 255))  # Reset to black
 
         self._scroll_to_bottom()
 
@@ -318,26 +320,9 @@ class ChatDisplay(BaseComponent):
 class MessageFormatter:
     """Formats messages for display in the chat."""
 
-    def __init__(self):
-        self.colors = {
-            "public": QColor(0, 100, 0),      # Dark green for public messages
-            "private": QColor(150, 0, 150),   # Purple for private messages
-            # "system": QColor(0, 0, 150),      # Blue for system messages
-            "sent": QColor(255, 255, 255),          # White for sent messages
-        }
-
-        # Assign color to each user
-        self.user_palette = [
-            QColor(255, 0, 0),    # Red
-            QColor(0, 255, 0),    # Green
-            QColor(0, 0, 255),    # Blue
-            QColor(255, 165, 0),  # Orange
-            QColor(128, 0, 128),  # Purple
-            QColor(0, 255, 255),  # Cyan
-            QColor(255, 192, 203)  # Pink
-        ]
-        self.user_colors = {}  # username -> QColor mapping
-        self.next_color_idx = 0
+    def __init__(self, color_manager=None):
+        # Use ColorManager for all color decisions
+        self.color_manager = color_manager
 
     def format_message(self, message: Dict[str, Any], is_sent: bool = False) -> str:
         """
@@ -372,22 +357,18 @@ class MessageFormatter:
 
         return formatted
 
-    def get_sender_color(self, sender: str, is_sent: bool = False) -> QColor:
-        """Assign and return a consistent color for each sender."""
-        if is_sent:
-            return self.colors["sent"]  # your own messages always white
+    def get_sender_color(self, sender: str, current_user: str) -> QColor:
+        """Get color for a specific sender using ColorManager."""
+        if self.color_manager:
+            return self.color_manager.get_user_color(sender, current_user)
+        else:
+            # Fallback to default color if ColorManager not available
+            return QColor(200, 200, 200)
 
-        if sender not in self.user_colors:
-            # Assign the next color in the palette (wrap around if needed)
-            color = self.user_palette[self.next_color_idx %
-                                      len(self.user_palette)]
-            self.user_colors[sender] = color
-            self.next_color_idx += 1
-
-        return self.user_colors[sender]
-
-    def get_message_color(self, message_type: str, is_sent: bool = False) -> QColor:
-        """Get the appropriate color for a message type."""
-        if is_sent:
-            return self.colors["sent"]
-        return self.colors.get(message_type, self.colors["sent"])
+    def get_message_color(self, message: Dict[str, Any], current_user: str) -> QColor:
+        """Get the appropriate color for a message using ColorManager."""
+        if self.color_manager:
+            return self.color_manager.get_message_color(message, current_user)
+        else:
+            # Fallback to default color if ColorManager not available
+            return QColor(200, 200, 200)
