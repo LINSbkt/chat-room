@@ -444,13 +444,48 @@ class MainWindow(QMainWindow):
 
     @Slot(object)
     def on_file_transfer_request(self, request):
-        """Handle incoming file transfer request - now auto-accepted, so this is just for logging."""
-        filename = request.filename  # Use property, not data dict
-        sender = request.sender or 'Unknown user'
+        """Handle incoming file transfer request by prompting the user to accept or decline."""
+        filename = getattr(request, 'filename', None) or request.data.get('filename', 'Unknown')
+        sender = getattr(request, 'sender', None) or 'Unknown user'
+        transfer_id = getattr(request, 'transfer_id', None) or getattr(request, 'message_id', None)
 
-        # File transfers are now auto-accepted, so we just log this
-        print(
-            f"DEBUG: File transfer request received and auto-accepted: {filename} from {sender}")
+        # Friendly human-readable size if available
+        file_size = getattr(request, 'file_size', None) or request.data.get('file_size')
+        def _hr_size(n):
+            try:
+                n = int(n)
+            except Exception:
+                return ''
+            for unit in ['B','KB','MB','GB']:
+                if n < 1024.0:
+                    return f"{n:.1f}{unit}"
+                n /= 1024.0
+            return f"{n:.1f}TB"
+
+        size_text = f" ({_hr_size(file_size)})" if file_size else ''
+
+        # Prompt user
+        resp = QMessageBox.question(self, "File Transfer Request",
+                                    f"User '{sender}' wants to send you the file:\n\n{filename}{size_text}\n\nAccept the file?",
+                                    QMessageBox.Yes | QMessageBox.No,
+                                    QMessageBox.Yes)
+
+        if resp == QMessageBox.Yes:
+            if transfer_id:
+                ok = self.chat_client.accept_file_transfer(transfer_id)
+                if ok:
+                    self.display_system_message(f"📥 Accepted file: {filename} from {sender}")
+                else:
+                    QMessageBox.warning(self, "Error", "Failed to accept file transfer")
+            else:
+                QMessageBox.warning(self, "Error", "Missing transfer id for file transfer request")
+        else:
+            # Decline
+            if transfer_id:
+                self.chat_client.decline_file_transfer(transfer_id, "Declined by user")
+                self.display_system_message(f"❌ Declined file: {filename} from {sender}")
+            else:
+                self.display_system_message(f"❌ Declined file request from {sender} (no id)")
 
     @Slot(str, int, int)
     def on_file_transfer_progress(self, transfer_id, current, total):

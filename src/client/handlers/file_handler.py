@@ -41,25 +41,23 @@ class FileHandler:
                     message.file_hash, message.sender, self.client_core.username,
                     is_public=not message.is_private
                 )
-                # Store whether this was a GLOBAL transfer for later reference
-                if success and transfer_id in self.client_core.file_transfer_manager.active_transfers:
-                    self.client_core.file_transfer_manager.active_transfers[transfer_id]['is_global'] = not message.is_private
                 if success:
                     self.logger.info(f"📥 Set up incoming transfer {transfer_id} for {message.filename}")
+
+                    # Store whether this was a GLOBAL transfer for later reference
+                    if transfer_id in self.client_core.file_transfer_manager.active_transfers:
+                        self.client_core.file_transfer_manager.active_transfers[transfer_id]['is_global'] = not message.is_private
                     
-                    # Auto-accept all file transfers (both public and private)
-                    print(f"🔥 DEBUG: AUTO-ACCEPTING FILE TRANSFER: {message.filename} from {message.sender}")
-                    self.logger.info(f"📥 Auto-accepting file transfer: {message.filename} from {message.sender}")
-                    self.client_core.signals.system_message.emit(f"📥 Auto-receiving file: {message.filename} from {message.sender}")
-                    
-                    # Send acceptance response immediately
+                    # Ensure the request has the transfer_id for the UI to reference
                     try:
-                        from ...shared.message_types import FileTransferResponse
-                    except ImportError:
-                        from shared.message_types import FileTransferResponse
-                    response = FileTransferResponse(transfer_id, True)
-                    print(f"🔥 DEBUG: SENDING AUTO-ACCEPT RESPONSE FOR: {transfer_id}")
-                    self.client_core.send_message(response)
+                        message.set_transfer_id(transfer_id)
+                    except Exception:
+                        message.message_id = transfer_id
+
+                    # Emit UI signal to prompt user for accept/decline
+                    print(f"🔥 DEBUG: Emitting file_transfer_request signal for: {message.filename} from {message.sender}")
+                    self.client_core.signals.file_transfer_request.emit(message)
+                    self.client_core.signals.system_message.emit(f"📥 Incoming file transfer request: {message.filename} from {message.sender}")
                 else:
                     self.logger.error(f"Failed to set up incoming transfer {transfer_id}")
                     self.client_core.signals.system_message.emit("Failed to prepare for file transfer")

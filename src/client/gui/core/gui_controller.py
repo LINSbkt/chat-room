@@ -400,14 +400,54 @@ class GUIController:
             logger.error(f"Error handling connection status change: {e}")
     
     def _on_file_transfer_request(self, request) -> None:
-        """Handle file transfer request - now auto-accepted, so this is just for logging."""
+        """Handle file transfer request by showing a dialog to the user."""
         try:
-            filename = getattr(request, 'filename', request.data.get('filename', 'Unknown file'))
-            sender = getattr(request, 'sender', request.data.get('sender', 'Unknown user'))
+            from ..components.dialogs.file_transfer_dialog import FileTransferDialog
             
-            # File transfers are now auto-accepted, so we just log this
-            print(f"🔥 DEBUG: GUI CONTROLLER - File transfer request received (should be auto-accepted): {filename} from {sender}")
-            logger.info(f"File transfer request received and auto-accepted: {filename} from {sender}")
+            filename = getattr(request, 'filename', None) or request.data.get('filename', 'Unknown file')
+            sender = getattr(request, 'sender', None) or request.data.get('sender', 'Unknown user')
+            transfer_id = getattr(request, 'transfer_id', None) or getattr(request, 'message_id', None)
+            
+            # Friendly human-readable size if available
+            file_size = getattr(request, 'file_size', None) or request.data.get('file_size')
+            def _hr_size(n):
+                try:
+                    n = int(n)
+                except Exception:
+                    return ''
+                for unit in ['B','KB','MB','GB']:
+                    if n < 1024.0:
+                        return f"{n:.1f}{unit}"
+                    n /= 1024.0
+                return f"{n:.1f}TB"
+            
+            size_text = _hr_size(file_size) if file_size else None
+            
+            # Create and show dialog
+            dialog = FileTransferDialog(filename, sender, size_text)
+            if dialog.exec_() == FileTransferDialog.Accepted:
+                # User clicked Accept
+                if transfer_id and self._chat_client:
+                    ok = self._chat_client.accept_file_transfer(transfer_id)
+                    if ok:
+                        self._on_system_message(f"📥 Accepted file: {filename} from {sender}")
+                    else:
+                        self._on_error_occurred("Failed to accept file transfer")
+                else:
+                    self._on_error_occurred("Missing transfer id for file transfer request")
+            else:
+                # User clicked Decline
+                if transfer_id and self._chat_client:
+                    self._chat_client.decline_file_transfer(transfer_id, "Declined by user")
+                    self._on_system_message(f"❌ Declined file: {filename} from {sender}")
+                else:
+                    self._on_system_message(f"❌ Declined file request from {sender} (no id)")
+            
+            print(f"🔥 DEBUG: GUI CONTROLLER - File transfer request handled: {filename} from {sender}")
+            
+        except Exception as e:
+            logger.error(f"Error handling file transfer request: {e}")
+            self._on_error_occurred(f"Error handling file transfer request: {e}")
             
         except Exception as e:
             logger.error(f"Error handling file transfer request: {e}")

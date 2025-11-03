@@ -46,7 +46,26 @@ def main():
 
     # Create Qt application
     app = QApplication(sys.argv)
-
+    
+    # List available styles and set appropriate style
+    available_styles = QStyleFactory.keys()
+    logger.debug(f"Available styles: {available_styles}")
+    
+    # Try to use preferred styles in order
+    preferred_styles = ['WindowsVista', 'Windows', 'Fusion']
+    selected_style = None
+    for style in preferred_styles:
+        if style in available_styles:
+            selected_style = style
+            break
+    
+    if selected_style:
+        app.setStyle(selected_style)
+        logger.info(f"Using Qt style: {selected_style}")
+        
+    # Set style before applying stylesheet
+    app.setStyle('Windows')  # Use 'Windows' style instead of 'Fusion'
+    
     # Apply Material Design stylesheet
     apply_stylesheet(app, theme='dark_teal.xml')
 
@@ -67,12 +86,12 @@ def main():
             # Create chat client
             chat_client = ChatClient(args.server, args.port)
 
-            # Create main window
-            main_window = MainWindow()
-            main_window.set_chat_client(chat_client, username)
+            # Create base window
+            base_window = MainWindow()
+            base_window.set_chat_client(chat_client, username)
 
-            # Wrap main window in modern window
-            main_window = qtmodern.windows.ModernWindow(main_window)
+            # Instead of wrapping, just show the base window directly
+            main_window = base_window  # Keep the reference as main_window
             
             # Connect to server
             if not chat_client.connect(username):
