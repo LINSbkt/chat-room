@@ -119,10 +119,14 @@ def main():
             # Start Qt event loop
             result = app.exec()
 
-            # If we get here, the main window was closed
-            # Check if it was due to authentication failure
+            # Exit if user closed the window intentionally
+            if hasattr(main_window, 'user_closed') and main_window.user_closed:
+                logger.info("User closed the main window, exiting.")
+                sys.exit(result)
+            # Retry login only if connection failed unexpectedly
             if not chat_client.connected:
                 # Authentication failed, retry login
+                logger.info("Connection lost, returning to login dialog.")
                 continue
             else:
                 # Normal exit
