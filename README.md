@@ -18,9 +18,8 @@ A secure, real-time chatroom application with GUI, file transfer, emojis, and en
 - **File history management** - Access previously received files
 - **New message notifications** - Visual indicators for unread messages
 ## Demo video
-https://github.com/LINSbkt/chat-room/blob/main/Demo.mp4
 
-[▶️ Demo Video – Realtime Chatroom](https://raw.githubusercontent.com/LINSbkt/chat-room/main/Demo.mp4)
+[▶️ Demo Video – Realtime Chatroom](https://drive.google.com/file/d/11Io3LfWiziY3SqPI21DVADvZ7GbZDHWh/view?usp=sharing)
 
 ## Installation
 
