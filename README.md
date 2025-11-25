@@ -17,6 +17,9 @@ A secure, real-time chatroom application with GUI, file transfer, emojis, and en
 - **User re-login capability** - Persistent data across sessions
 - **File history management** - Access previously received files
 - **New message notifications** - Visual indicators for unread messages
+## Demo video
+
+[▶️ Demo Video – Realtime Chatroom](https://raw.githubusercontent.com/LINSbkt/chat-room/main/Demo.mp4)
 
 ## Installation
 
@@ -70,7 +73,7 @@ Optional arguments:
 
 ## Testing
 
-### Phase 1 Testing - Basic Chat
+### Basic Chat
 1. Start server: `python run_server.py`
 2. Start client 1: `python run_client.py` → Enter "Alice"
 3. Start client 2: `python run_client.py` → Enter "Bob"
@@ -179,8 +182,7 @@ chat-room/
 
 ### Testing
 - Unit tests for individual components
-- Integration tests for workflows
-- Performance tests for scalability
+- Some integration tests for workflows
 
 ### Contributing Guidelines
 1. Fork the repository
