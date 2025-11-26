@@ -81,11 +81,6 @@ Optional arguments:
 5. Send messages between clients
 6. Verify all clients receive messages
 
-### Running Tests
-```bash
-python -m pytest tests/ -v
-```
-
 ## Project Structure
 
 ```
@@ -125,7 +120,6 @@ chat-room/
 
 ### New Message Notifications
 - Red dot indicators on user list for unread messages
-- Separate notification counts for common chat and private conversations
 - Notifications clear automatically when viewing messages
 - Real-time notification updates
 
@@ -219,18 +213,6 @@ Run with debug flag for detailed logging:
 python run_server.py --debug
 python run_client.py --debug
 ```
-
-## Performance
-
-### Scalability
-- Supports up to 100 concurrent users (configurable)
-- Efficient message routing and broadcasting
-- Optimized file transfer with chunking
-
-### Resource Usage
-- Minimal memory footprint
-- Efficient network usage
-- Cross-platform compatibility
 
 ## License
 
